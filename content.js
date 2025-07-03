@@ -28,7 +28,7 @@ class YouTubeTranscriptionExtractor {
     }).observe(document, { subtree: true, childList: true });
   }
 
-  addButton() {
+  async addButton() {
     // 检查是否是视频页面
     if (!this.isVideoPage()) {
       return;
@@ -39,10 +39,80 @@ class YouTubeTranscriptionExtractor {
       return;
     }
 
-    // 等待页面元素加载
-    setTimeout(() => {
-      this.createAndInsertButton();
-    }, 2000);
+    // 使用更可靠的等待机制
+    await this.waitForButtonContainerAndInsert();
+  }
+
+  async waitForButtonContainerAndInsert() {
+    console.log('开始等待按钮容器出现...');
+    
+    // 定义要等待的选择器，按优先级排序
+    const selectors = [
+      '#actions-inner #top-level-buttons-computed',
+      '#top-level-buttons-computed',
+      '#actions-inner',
+      '#actions #menu-container',
+      '#menu-container'
+    ];
+
+    // 尝试等待每个选择器，直到找到合适的容器
+    for (const selector of selectors) {
+      try {
+        console.log('等待容器:', selector);
+        const element = await this.waitForElement(selector, 3000);
+        
+        if (element && this.isValidButtonContainer(element)) {
+          console.log('找到有效容器，开始插入按钮');
+          this.createAndInsertButtonToContainer(element);
+          return;
+        } else {
+          console.log('容器无效，尝试下一个');
+        }
+      } catch (error) {
+        console.log(`等待 ${selector} 超时，尝试下一个`);
+        continue;
+      }
+    }
+
+    // 如果所有选择器都失败，使用备用策略
+    console.log('主要策略失败，使用备用策略');
+    await this.fallbackButtonInsertion();
+  }
+
+  async fallbackButtonInsertion() {
+    try {
+      // 等待至少有一个操作按钮出现
+      const existingButtonSelectors = [
+        'button[aria-label*="like" i]',
+        'button[aria-label*="Share" i]',
+        'button[aria-label*="Save" i]'
+      ];
+
+      for (const buttonSelector of existingButtonSelectors) {
+        try {
+          const existingButton = await this.waitForElement(buttonSelector, 2000);
+          if (existingButton) {
+            const container = existingButton.closest('#top-level-buttons-computed, #actions-inner, #menu-container, .style-scope.ytd-menu-renderer');
+            if (container) {
+              console.log('通过已存在按钮找到容器，插入按钮');
+              this.createAndInsertButtonToContainer(container);
+              return;
+            }
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+
+      // 最后的备用方案：简单的定时重试
+      console.log('使用最后的备用方案');
+      setTimeout(() => {
+        this.createAndInsertButton();
+      }, 1000);
+      
+    } catch (error) {
+      console.log('备用策略也失败了:', error);
+    }
   }
 
   isVideoPage() {
@@ -57,6 +127,10 @@ class YouTubeTranscriptionExtractor {
       return;
     }
 
+    this.createAndInsertButtonToContainer(targetContainer);
+  }
+
+  createAndInsertButtonToContainer(targetContainer) {
     // 创建按钮
     this.button = document.createElement('button');
     this.button.className = 'yt-transcript-extractor-btn';
@@ -72,6 +146,7 @@ class YouTubeTranscriptionExtractor {
 
     // 插入按钮
     targetContainer.appendChild(this.button);
+    console.log('按钮成功插入到容器中');
   }
 
   findButtonContainer() {
