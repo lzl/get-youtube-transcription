@@ -1,0 +1,27 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="64" cy="64" r="60" fill="#ff0000" stroke="#cc0000" stroke-width="2"/>
+  
+  <!-- 播放按钮形状 -->
+  <polygon points="45,35 45,93 90,64" fill="white"/>
+  
+  <!-- 转录线条 -->
+  <rect x="25" y="100" width="25" height="3" fill="white" rx="1"/>
+  <rect x="55" y="100" width="20" height="3" fill="white" rx="1"/>
+  <rect x="80" y="100" width="23" height="3" fill="white" rx="1"/>
+  
+  <rect x="25" y="107" width="30" height="3" fill="white" rx="1"/>
+  <rect x="60" y="107" width="18" height="3" fill="white" rx="1"/>
+  <rect x="83" y="107" width="20" height="3" fill="white" rx="1"/>
+  
+  <rect x="25" y="114" width="22" height="3" fill="white" rx="1"/>
+  <rect x="52" y="114" width="28" height="3" fill="white" rx="1"/>
+  <rect x="85" y="114" width="18" height="3" fill="white" rx="1"/>
+  
+  <!-- 小型文档图标 -->
+  <rect x="95" y="25" width="20" height="25" fill="white" rx="2"/>
+  <rect x="98" y="30" width="14" height="2" fill="#ff0000"/>
+  <rect x="98" y="35" width="12" height="2" fill="#ff0000"/>
+  <rect x="98" y="40" width="14" height="2" fill="#ff0000"/>
+  <rect x="98" y="45" width="10" height="2" fill="#ff0000"/>
+</svg> 

@@ -1,0 +1,238 @@
+/* YouTube Transcription Extractor Styles */
+
+/* 按钮样式 */
+.yt-transcript-extractor-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin: 0 8px;
+  border: none;
+  border-radius: 18px;
+  background: var(--yt-spec-button-chip-background-hover, #f1f1f1);
+  color: var(--yt-spec-text-primary, #0f0f0f);
+  font-family: "YouTube Sans", "Roboto", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  height: 36px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  outline: none;
+  position: relative;
+  z-index: 1;
+}
+
+.yt-transcript-extractor-btn:hover {
+  background: var(--yt-spec-button-chip-background-hover, #e5e5e5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.yt-transcript-extractor-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.yt-transcript-extractor-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.yt-transcript-extractor-btn svg {
+  width: 20px;
+  height: 20px;
+  opacity: 0.8;
+}
+
+.yt-transcript-extractor-btn span {
+  line-height: 1;
+}
+
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+  .yt-transcript-extractor-btn {
+    background: var(--yt-spec-button-chip-background-hover, #3f3f3f);
+    color: var(--yt-spec-text-primary, #f1f1f1);
+  }
+  
+  .yt-transcript-extractor-btn:hover {
+    background: var(--yt-spec-button-chip-background-hover, #525252);
+  }
+}
+
+/* YouTube 暗色主题 */
+html[dark] .yt-transcript-extractor-btn,
+html[system-theme="dark"] .yt-transcript-extractor-btn {
+  background: var(--yt-spec-button-chip-background-hover, #3f3f3f);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+}
+
+html[dark] .yt-transcript-extractor-btn:hover,
+html[system-theme="dark"] .yt-transcript-extractor-btn:hover {
+  background: var(--yt-spec-button-chip-background-hover, #525252);
+}
+
+/* 通知样式 */
+.yt-transcript-notification {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 9999;
+  background: #fff;
+  color: #333;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: "YouTube Sans", "Roboto", sans-serif;
+  font-size: 14px;
+  max-width: 300px;
+  word-wrap: break-word;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s ease;
+  border-left: 4px solid #065fd4;
+}
+
+.yt-transcript-notification.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.yt-transcript-notification-success {
+  border-left-color: #00b96b;
+  background: #f0f9f4;
+  color: #0d7c47;
+}
+
+.yt-transcript-notification-error {
+  border-left-color: #d93025;
+  background: #fef7f0;
+  color: #c5221f;
+}
+
+.yt-transcript-notification-info {
+  border-left-color: #065fd4;
+  background: #f0f4ff;
+  color: #1a73e8;
+}
+
+/* 暗色主题通知 */
+@media (prefers-color-scheme: dark) {
+  .yt-transcript-notification {
+    background: #3f3f3f;
+    color: #fff;
+  }
+  
+  .yt-transcript-notification-success {
+    background: #1a5d1a;
+    color: #4caf50;
+  }
+  
+  .yt-transcript-notification-error {
+    background: #5d1a1a;
+    color: #f44336;
+  }
+  
+  .yt-transcript-notification-info {
+    background: #1a3a5d;
+    color: #2196f3;
+  }
+}
+
+html[dark] .yt-transcript-notification,
+html[system-theme="dark"] .yt-transcript-notification {
+  background: #3f3f3f;
+  color: #fff;
+}
+
+html[dark] .yt-transcript-notification-success,
+html[system-theme="dark"] .yt-transcript-notification-success {
+  background: #1a5d1a;
+  color: #4caf50;
+}
+
+html[dark] .yt-transcript-notification-error,
+html[system-theme="dark"] .yt-transcript-notification-error {
+  background: #5d1a1a;
+  color: #f44336;
+}
+
+html[dark] .yt-transcript-notification-info,
+html[system-theme="dark"] .yt-transcript-notification-info {
+  background: #1a3a5d;
+  color: #2196f3;
+}
+
+/* 适配不同的 YouTube 布局 */
+@media (max-width: 1024px) {
+  .yt-transcript-extractor-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    height: 32px;
+  }
+  
+  .yt-transcript-extractor-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  .yt-transcript-extractor-btn span {
+    display: none;
+  }
+  
+  .yt-transcript-extractor-btn {
+    padding: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin: 0 4px;
+  }
+  
+  .yt-transcript-notification {
+    top: 60px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
+
+/* 确保按钮在各种容器中都能正确显示 */
+#actions-inner .yt-transcript-extractor-btn,
+#menu-container .yt-transcript-extractor-btn {
+  margin-left: 8px;
+}
+
+/* 兼容旧版 YouTube 样式 */
+.watch-action-panels .yt-transcript-extractor-btn {
+  margin: 0 4px;
+}
+
+/* 提升按钮的视觉层级 */
+.yt-transcript-extractor-btn {
+  position: relative;
+  z-index: 1;
+}
+
+/* 确保按钮在不同的 YouTube 主题下都能正常显示 */
+ytd-watch-flexy[theater] .yt-transcript-extractor-btn {
+  margin: 0 4px;
+}
+
+/* 加载状态样式 */
+.yt-transcript-extractor-btn:disabled {
+  pointer-events: none;
+}
+
+.yt-transcript-extractor-btn:disabled svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+} 
