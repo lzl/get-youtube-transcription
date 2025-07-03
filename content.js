@@ -61,13 +61,13 @@ class YouTubeTranscriptionExtractor {
     this.button = document.createElement('button');
     this.button.className = 'yt-transcript-extractor-btn';
     this.button.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
         <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
       </svg>
-      <span>获取转录</span>
+      <span>Transcript</span>
     `;
     
-    this.button.title = '获取当前视频的转录文本';
+    this.button.title = 'Get video transcript';
     this.button.addEventListener('click', () => this.extractTranscription());
 
     // 插入按钮
@@ -75,23 +75,77 @@ class YouTubeTranscriptionExtractor {
   }
 
   findButtonContainer() {
-    // 尝试多个可能的容器位置
+    console.log('开始查找合适的按钮容器...');
+    
+    // 更精确的选择器，专门针对操作按钮区域
     const selectors = [
-      '#actions-inner', // 新版 YouTube 的操作按钮区域
-      '#menu-container #top-level-buttons-computed', // 操作按钮容器
-      '#actions #menu-container', // 另一个可能的位置
-      '.style-scope.ytd-menu-renderer', // 菜单渲染器
-      '#owner' // 作为后备选项
+      // YouTube 2023+ 版本的操作按钮区域
+      '#actions-inner #top-level-buttons-computed',
+      '#top-level-buttons-computed',
+      
+      // 备用选择器
+      '#actions-inner',
+      '#actions #menu-container',
+      
+      // 通过寻找已知的操作按钮来定位容器
+      '.yt-spec-button-shape-next--icon-only-default', // 点赞按钮的父容器
+      '.ytd-menu-renderer[button-renderer] #top-level-buttons-computed',
+      
+      // 更通用的备用方案
+      '#menu-container',
+      '.style-scope.ytd-menu-renderer'
     ];
 
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element) {
-        return element;
+        console.log('找到合适的容器:', selector);
+        
+        // 验证这是正确的操作按钮区域
+        if (this.isValidButtonContainer(element)) {
+          return element;
+        }
       }
     }
 
+    // 如果上述方法都失败，尝试通过已存在的按钮来找到容器
+    console.log('尝试通过已存在的按钮查找容器...');
+    const existingButtons = [
+      'button[aria-label*="like" i]', // 点赞按钮
+      'button[aria-label*="Share" i]', // 分享按钮
+      'button[aria-label*="Save" i]', // 保存按钮
+      'button[aria-label*="Thanks" i]' // 感谢按钮
+    ];
+
+    for (const buttonSelector of existingButtons) {
+      const button = document.querySelector(buttonSelector);
+      if (button) {
+        const container = button.closest('#top-level-buttons-computed, #actions-inner, #menu-container');
+        if (container) {
+          console.log('通过已存在按钮找到容器:', buttonSelector);
+          return container;
+        }
+      }
+    }
+
+    console.log('未找到合适的按钮容器');
     return null;
+  }
+
+  isValidButtonContainer(element) {
+    // 检查容器是否包含其他操作按钮
+    const hasActionButtons = element.querySelector('button[aria-label*="like" i], button[aria-label*="Share" i], button[aria-label*="Save" i]');
+    
+    // 检查容器是否在正确的区域（不是标题区域）
+    const isInTitleArea = element.closest('#title, .title, ytd-video-primary-info-renderer #container');
+    
+    console.log('容器验证:', {
+      hasActionButtons: !!hasActionButtons,
+      isInTitleArea: !!isInTitleArea,
+      valid: !!hasActionButtons && !isInTitleArea
+    });
+    
+    return !!hasActionButtons && !isInTitleArea;
   }
 
   async extractTranscription() {
@@ -111,17 +165,17 @@ class YouTubeTranscriptionExtractor {
       if (transcription) {
         console.log('成功获取转录，字符数:', transcription.length);
         await this.copyToClipboard(transcription);
-        this.showNotification(`转录已复制到剪贴板！(${transcription.length} 字符)`, 'success');
+        this.showNotification(`Transcript copied to clipboard! (${transcription.length} characters)`, 'success');
       } else {
         console.log('获取转录失败');
-        this.showNotification('未找到转录文本。请确认视频有字幕/转录功能。', 'error');
+        this.showNotification('No transcript found. Please ensure the video has captions/transcript available.', 'error');
         
         // 提供额外的诊断信息
         this.showDebugInfo();
       }
     } catch (error) {
       console.error('获取转录时出错:', error);
-      this.showNotification('获取转录失败: ' + error.message, 'error');
+      this.showNotification('Failed to get transcript: ' + error.message, 'error');
     } finally {
       this.isProcessing = false;
       this.updateButtonState('normal');
@@ -573,10 +627,10 @@ class YouTubeTranscriptionExtractor {
 
     const span = this.button.querySelector('span');
     if (state === 'processing') {
-      span.textContent = '处理中...';
+      span.textContent = 'Loading...';
       this.button.disabled = true;
     } else {
-      span.textContent = '获取转录';
+      span.textContent = 'Transcript';
       this.button.disabled = false;
     }
   }
