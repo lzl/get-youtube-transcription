@@ -116,7 +116,13 @@ class YouTubeTranscriptionExtractor {
   }
 
   isVideoPage() {
-    return location.pathname === '/watch' && location.search.includes('v=');
+    // 支持普通视频页面：/watch?v=videoId
+    const isWatchPage = location.pathname === '/watch' && location.search.includes('v=');
+    
+    // 支持直播页面：/live/videoId
+    const isLivePage = location.pathname.startsWith('/live/');
+    
+    return isWatchPage || isLivePage;
   }
 
   createAndInsertButton() {
@@ -352,8 +358,18 @@ class YouTubeTranscriptionExtractor {
   }
 
   getVideoId() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('v');
+    // 普通视频页面：从查询参数获取 videoId
+    if (location.pathname === '/watch') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('v');
+    }
+    
+    // 直播页面：从路径获取 videoId
+    if (location.pathname.startsWith('/live/')) {
+      return location.pathname.split('/live/')[1];
+    }
+    
+    return null;
   }
 
   async fetchTranscriptionFromAPI(videoId) {
