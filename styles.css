@@ -10,8 +10,9 @@
   margin: 0;
   border: none;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+  /* Light mode 默认样式 */
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f0f0f;
   font-family: "Roboto", "Arial", sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -28,11 +29,44 @@
 }
 
 .yt-transcript-extractor-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .yt-transcript-extractor-btn:active {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Dark mode 样式 */
+@media (prefers-color-scheme: dark) {
+  .yt-transcript-extractor-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+  
+  .yt-transcript-extractor-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .yt-transcript-extractor-btn:active {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* YouTube 手动设置的 dark mode */
+html[dark] .yt-transcript-extractor-btn,
+html[system-theme="dark"] .yt-transcript-extractor-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+html[dark] .yt-transcript-extractor-btn:hover,
+html[system-theme="dark"] .yt-transcript-extractor-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+html[dark] .yt-transcript-extractor-btn:active,
+html[system-theme="dark"] .yt-transcript-extractor-btn:active {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 
@@ -151,8 +185,9 @@ html[system-theme="dark"] .yt-transcript-notification-info {
     font-size: 14px;
     height: 36px;
     line-height: 36px;
-    background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
+    /* Light mode 样式保持一致 */
+    background: rgba(0, 0, 0, 0.05);
+    color: #0f0f0f;
   }
   
   .yt-transcript-extractor-btn svg {
@@ -162,6 +197,21 @@ html[system-theme="dark"] .yt-transcript-notification-info {
   
   .yt-transcript-extractor-btn span {
     line-height: 36px;
+  }
+}
+
+@media (max-width: 1024px) and (prefers-color-scheme: dark) {
+  .yt-transcript-extractor-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+}
+
+@media (max-width: 1024px) {
+  html[dark] .yt-transcript-extractor-btn,
+  html[system-theme="dark"] .yt-transcript-extractor-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
   }
 }
 
@@ -178,8 +228,9 @@ html[system-theme="dark"] .yt-transcript-notification-info {
     border-radius: 50%;
     margin-left: 8px;
     margin-right: 0;
-    background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
+    /* Light mode 样式保持一致 */
+    background: rgba(0, 0, 0, 0.05);
+    color: #0f0f0f;
   }
   
   .yt-transcript-extractor-btn svg {
@@ -192,6 +243,21 @@ html[system-theme="dark"] .yt-transcript-notification-info {
     right: 10px;
     left: 10px;
     max-width: none;
+  }
+}
+
+@media (max-width: 768px) and (prefers-color-scheme: dark) {
+  .yt-transcript-extractor-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+}
+
+@media (max-width: 768px) {
+  html[dark] .yt-transcript-extractor-btn,
+  html[system-theme="dark"] .yt-transcript-extractor-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
   }
 }
 
