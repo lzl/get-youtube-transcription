@@ -469,34 +469,72 @@ class YouTubeTranscriptionExtractor {
           const elements = xmlDoc.querySelectorAll(tag);
           if (elements.length > 0) {
             console.log(`找到 ${elements.length} 个 ${tag} 元素`);
-            const transcription = Array.from(elements)
-              .map(element => this.decodeHTMLEntities(element.textContent.trim()))
-              .filter(text => text.length > 0)
-              .join(' ');
+            const segments = [];
             
-            if (transcription.length > 0) {
-              return transcription;
+            for (const element of elements) {
+              const text = this.decodeHTMLEntities(element.textContent.trim());
+              const startTime = element.getAttribute('start') || element.getAttribute('t');
+              
+              if (text.length > 0) {
+                if (startTime) {
+                  segments.push(`${this.formatTime(startTime)}: ${text}`);
+                } else {
+                  segments.push(text);
+                }
+              }
+            }
+            
+            if (segments.length > 0) {
+              // 去重并返回结果
+              return [...new Set(segments)].join('\n');
             }
           }
         }
         return null;
       }
       
-      const transcription = Array.from(textElements)
-        .map(element => {
-          // 解码 HTML 实体
-          const text = this.decodeHTMLEntities(element.textContent.trim());
-          return text;
-        })
-        .filter(text => text.length > 0)
-        .join(' ');
+      const segments = [];
+      
+      for (const element of textElements) {
+        // 解码 HTML 实体
+        const text = this.decodeHTMLEntities(element.textContent.trim());
+        const startTime = element.getAttribute('start') || element.getAttribute('t');
+        
+        if (text.length > 0) {
+          if (startTime) {
+            segments.push(`${this.formatTime(startTime)}: ${text}`);
+          } else {
+            segments.push(text);
+          }
+        }
+      }
 
-      console.log('解析完成，转录长度:', transcription.length);
-      return transcription.length > 0 ? transcription : null;
+      if (segments.length > 0) {
+        // 去重并返回结果
+        const uniqueSegments = [...new Set(segments)];
+        console.log('解析完成，转录段落数:', uniqueSegments.length);
+        return uniqueSegments.join('\n');
+      }
+      
+      return null;
       
     } catch (error) {
       console.error('XML 解析失败:', error);
       return null;
+    }
+  }
+
+  // 修改格式化时间戳的方法，确保格式正确
+  formatTime(seconds) {
+    const sec = parseFloat(seconds);
+    const hours = Math.floor(sec / 3600);
+    const minutes = Math.floor((sec % 3600) / 60);
+    const remainingSeconds = Math.floor(sec % 60);
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    } else {
+      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
   }
 
@@ -576,22 +614,16 @@ class YouTubeTranscriptionExtractor {
   }
 
   async extractTranscriptionContent() {
+    console.log('开始提取转录内容...');
+    
     // 尝试多种选择器来获取转录内容
     const contentSelectors = [
       // 新的转录面板选择器
       'ytd-transcript-renderer',
       'ytd-transcript-segment-list-renderer',
       '#segments.ytd-transcript-segment-list-renderer',
-      '.ytd-transcript-segment-renderer',
-      '[data-start-time]',
       // 转录段落选择器
-      'ytd-transcript-body-renderer',
-      '.segment-text',
-      '.segment.style-scope.ytd-transcript-segment-renderer',
-      // 备用选择器
-      '[role="presentation"] [data-start-time]',
-      '.cue-group',
-      '.caption-line'
+      'ytd-transcript-body-renderer'
     ];
 
     for (const selector of contentSelectors) {
@@ -601,59 +633,119 @@ class YouTubeTranscriptionExtractor {
       if (container) {
         console.log('找到容器:', selector);
         
-        // 如果是段落容器，获取所有文本段
-        if (selector.includes('segment') || selector === '[data-start-time]') {
-          const segments = container.querySelectorAll ? 
-            container.querySelectorAll('*') : [container];
+        // 查找所有转录段落元素
+        const segmentElements = container.querySelectorAll('ytd-transcript-segment-renderer');
+        
+        if (segmentElements.length > 0) {
+          console.log('找到转录段落:', segmentElements.length);
           
-          const texts = [];
-          for (const segment of segments) {
-            // 获取文本内容，排除时间戳
-            const textContent = this.cleanTranscriptText(segment.textContent || segment.innerText || '');
-            if (textContent) {
-              texts.push(textContent);
+          const transcriptSegments = [];
+          
+          for (const segment of segmentElements) {
+            try {
+              // 获取时间戳 - 从子元素中查找
+              const timestampElement = segment.querySelector('[data-start-time]');
+              const timestamp = timestampElement?.getAttribute('data-start-time');
+              
+              // 获取文本内容 - 从段落的文本部分获取
+              const textElement = segment.querySelector('.segment-text, ytd-transcript-segment-renderer .text, .ytd-transcript-segment-renderer');
+              let textContent = '';
+              
+              if (textElement) {
+                textContent = this.cleanTranscriptText(textElement.textContent || textElement.innerText || '');
+              } else {
+                // 如果没有找到特定的文本元素，从整个段落获取
+                textContent = this.cleanTranscriptText(segment.textContent || segment.innerText || '');
+                // 移除可能包含的时间戳文本
+                textContent = textContent.replace(/^\d+:\d+\s*/, '').trim();
+              }
+              
+              console.log('段落处理:', {
+                timestamp,
+                textLength: textContent.length,
+                textPreview: textContent.substring(0, 50) + '...'
+              });
+              
+              if (textContent && textContent.length > 0) {
+                if (timestamp) {
+                  const formattedTime = this.formatTime(timestamp);
+                  transcriptSegments.push(`${formattedTime}: ${textContent}`);
+                } else {
+                  transcriptSegments.push(textContent);
+                }
+              }
+            } catch (error) {
+              console.log('处理段落时出错:', error);
+              continue;
             }
           }
           
-          if (texts.length > 0) {
-            return texts.join(' ');
+          if (transcriptSegments.length > 0) {
+            console.log('成功提取转录段落:', transcriptSegments.length);
+            return transcriptSegments.join('\n');
           }
         }
         
-        // 如果是整个容器，直接获取文本内容
-        const allText = this.cleanTranscriptText(container.textContent || container.innerText || '');
-        if (allText) {
-          return allText;
+        // 如果没有找到标准的segment元素，尝试其他方式
+        console.log('尝试其他提取方式...');
+        const allTimestampElements = container.querySelectorAll('[data-start-time]');
+        
+        if (allTimestampElements.length > 0) {
+          console.log('找到时间戳元素:', allTimestampElements.length);
+          
+          const transcriptSegments = [];
+          
+          for (const timestampElement of allTimestampElements) {
+            try {
+              const timestamp = timestampElement.getAttribute('data-start-time');
+              
+              // 查找对应的文本内容
+              let textContent = '';
+              
+              // 尝试从父元素或兄弟元素中获取文本
+              const parentElement = timestampElement.closest('ytd-transcript-segment-renderer');
+              if (parentElement) {
+                textContent = this.cleanTranscriptText(parentElement.textContent || parentElement.innerText || '');
+                // 移除时间戳文本
+                textContent = textContent.replace(/^\d+:\d+\s*/, '').trim();
+              } else {
+                // 尝试从下一个兄弟元素获取
+                const nextSibling = timestampElement.nextElementSibling;
+                if (nextSibling) {
+                  textContent = this.cleanTranscriptText(nextSibling.textContent || nextSibling.innerText || '');
+                }
+              }
+              
+              if (textContent && textContent.length > 0) {
+                const formattedTime = this.formatTime(timestamp);
+                transcriptSegments.push(`${formattedTime}: ${textContent}`);
+              }
+            } catch (error) {
+              console.log('处理时间戳元素时出错:', error);
+              continue;
+            }
+          }
+          
+          if (transcriptSegments.length > 0) {
+            console.log('通过时间戳元素提取成功:', transcriptSegments.length);
+            return transcriptSegments.join('\n');
+          }
         }
       }
     }
 
-    // 最后的备用方案：查找所有可能包含转录的元素
-    console.log('使用备用方案搜索转录内容...');
-    const allElements = document.querySelectorAll('*');
-    for (const element of allElements) {
-      if (element.getAttribute('data-start-time') || 
-          element.className.includes('transcript') ||
-          element.className.includes('segment')) {
-        const text = this.cleanTranscriptText(element.textContent || '');
-        if (text && text.length > 20) { // 假设转录文本应该比较长
-          console.log('找到可能的转录内容');
-          return text;
-        }
-      }
-    }
-
+    console.log('所有提取方式都失败了');
     return null;
   }
 
   cleanTranscriptText(text) {
     if (!text) return '';
     
-    // 清理转录文本
+    // 清理转录文本，但保留现有的时间戳格式
     return text
-      .replace(/^\d+:\d+:\d+|\d+:\d+/g, '') // 移除时间戳
       .replace(/\s+/g, ' ') // 合并空格
-      .trim();
+      .trim()
+      .replace(/^\s*-\s*/, ''); // 移除开头的短横线
   }
 
   sleep(ms) {
