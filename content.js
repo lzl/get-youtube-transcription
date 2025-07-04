@@ -3,6 +3,7 @@ class YouTubeTranscriptionExtractor {
   constructor() {
     this.button = null;
     this.isProcessing = false;
+    this.buttonContainerObserver = null;
     this.init();
   }
 
@@ -12,106 +13,155 @@ class YouTubeTranscriptionExtractor {
     // 监听页面变化，因为 YouTube 是单页应用
     this.observePageChanges();
     // 立即尝试添加按钮
-    this.addButton();
+    this.startButtonContainerObserver();
   }
 
   observePageChanges() {
     // 监听 URL 变化
     let lastUrl = location.href;
-    new MutationObserver(() => {
+    
+    const handlePageChange = () => {
       const url = location.href;
       if (url !== lastUrl) {
         lastUrl = url;
-        // URL 改变时重新添加按钮
-        setTimeout(() => this.addButton(), 1000);
+        console.log('检测到页面变化:', url);
+        
+        // 清理旧的按钮引用和监听器
+        this.cleanupButton();
+        
+        // 立即开始监听按钮容器的出现
+        this.startButtonContainerObserver();
       }
-    }).observe(document, { subtree: true, childList: true });
+    };
+
+    // 使用多种方式监听页面变化
+    new MutationObserver(handlePageChange).observe(document, { 
+      subtree: true, 
+      childList: true 
+    });
+
+    // 监听浏览器历史变化
+    window.addEventListener('popstate', handlePageChange);
+    
+    // 监听YouTube的自定义事件
+    window.addEventListener('yt-navigate-finish', handlePageChange);
+    window.addEventListener('yt-page-data-updated', handlePageChange);
   }
 
-  async addButton() {
+  cleanupButton() {
+    // 断开之前的观察器
+    if (this.buttonContainerObserver) {
+      this.buttonContainerObserver.disconnect();
+      this.buttonContainerObserver = null;
+    }
+    
+    // 清理按钮引用
+    this.button = null;
+  }
+
+  startButtonContainerObserver() {
+    if (!this.isVideoPage()) {
+      return;
+    }
+
+    console.log('开始监听按钮容器出现...');
+    
+    // 立即尝试一次
+    this.tryAddButton();
+    
+    // 创建专门监听按钮容器区域的观察器
+    this.buttonContainerObserver = new MutationObserver((mutations) => {
+      // 检查是否有相关的DOM变化
+      const hasRelevantChanges = mutations.some(mutation => {
+        // 检查添加的节点
+        if (mutation.addedNodes.length > 0) {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // 检查是否包含我们关注的按钮容器
+              if (this.containsButtonContainer(node)) {
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      });
+      
+      if (hasRelevantChanges) {
+        console.log('检测到按钮容器相关变化，尝试添加按钮');
+        this.tryAddButton();
+      }
+    });
+
+    // 观察整个视频页面的主要内容区域
+    const mainContent = document.querySelector('#primary, #page-manager, ytd-app') || document.body;
+    this.buttonContainerObserver.observe(mainContent, {
+      childList: true,
+      subtree: true,
+      attributeFilter: ['class', 'id'] // 只关注class和id变化
+    });
+
+    // 额外监听特定的YouTube事件
+    this.listenToYouTubeEvents();
+  }
+
+  containsButtonContainer(element) {
+    // 检查元素或其子元素是否包含按钮容器
+    const containerSelectors = [
+      '#actions-inner',
+      '#top-level-buttons-computed', 
+      '#menu-container',
+      '.ytd-menu-renderer',
+      '[class*="actions"]',
+      '[id*="actions"]'
+    ];
+    
+    return containerSelectors.some(selector => {
+      return element.matches && element.matches(selector) || 
+             element.querySelector && element.querySelector(selector);
+    });
+  }
+
+  listenToYouTubeEvents() {
+    // 监听YouTube的内部事件
+    const youtubeEvents = [
+      'yt-navigate-finish',
+      'yt-page-data-updated', 
+      'yt-player-updated',
+      'yt-action-panel-update',
+      'yt-watch-comments-loaded'
+    ];
+    
+    youtubeEvents.forEach(eventName => {
+      window.addEventListener(eventName, () => {
+        console.log(`检测到YouTube事件: ${eventName}`);
+        // 延迟很短的时间让DOM更新完成
+        setTimeout(() => this.tryAddButton(), 100);
+      });
+    });
+  }
+
+  tryAddButton() {
+    // 检查是否已有按钮且仍在DOM中
+    if (this.button && document.contains(this.button)) {
+      return;
+    }
+
+    // 清理失效的按钮引用
+    if (this.button && !document.contains(this.button)) {
+      this.button = null;
+    }
+
     // 检查是否是视频页面
     if (!this.isVideoPage()) {
       return;
     }
 
-    // 避免重复添加按钮
-    if (this.button && document.contains(this.button)) {
-      return;
-    }
-
-    // 使用更可靠的等待机制
-    await this.waitForButtonContainerAndInsert();
-  }
-
-  async waitForButtonContainerAndInsert() {
-    console.log('开始等待按钮容器出现...');
-    
-    // 定义要等待的选择器，按优先级排序
-    const selectors = [
-      '#actions-inner #top-level-buttons-computed',
-      '#top-level-buttons-computed',
-      '#actions-inner',
-      '#actions #menu-container',
-      '#menu-container'
-    ];
-
-    // 尝试等待每个选择器，直到找到合适的容器
-    for (const selector of selectors) {
-      try {
-        console.log('等待容器:', selector);
-        const element = await this.waitForElement(selector, 3000);
-        
-        if (element && this.isValidButtonContainer(element)) {
-          console.log('找到有效容器，开始插入按钮');
-          this.createAndInsertButtonToContainer(element);
-          return;
-        } else {
-          console.log('容器无效，尝试下一个');
-        }
-      } catch (error) {
-        console.log(`等待 ${selector} 超时，尝试下一个`);
-        continue;
-      }
-    }
-
-    // 如果所有选择器都失败，使用备用策略
-    console.log('主要策略失败，使用备用策略');
-    await this.fallbackButtonInsertion();
-  }
-
-  async fallbackButtonInsertion() {
-    try {
-      // 等待至少有一个操作按钮出现
-      const existingButtonSelectors = [
-        'button[aria-label*="like" i]',
-        'button[aria-label*="Share" i]',
-        'button[aria-label*="Save" i]'
-      ];
-
-      for (const buttonSelector of existingButtonSelectors) {
-        try {
-          const existingButton = await this.waitForElement(buttonSelector, 2000);
-          if (existingButton) {
-            const container = existingButton.closest('#top-level-buttons-computed, #actions-inner, #menu-container, .style-scope.ytd-menu-renderer');
-            if (container) {
-              console.log('通过已存在按钮找到容器，插入按钮');
-              this.createAndInsertButtonToContainer(container);
-              return;
-            }
-          }
-        } catch (error) {
-          continue;
-        }
-      }
-
-      // 最后的备用方案：简单的定时重试
-      console.log('使用最后的备用方案');
-      setTimeout(() => {
-        this.createAndInsertButton();
-      }, 1000);
-      
-    } catch (error) {
-      console.log('备用策略也失败了:', error);
+    // 尝试找到容器并添加按钮
+    const container = this.findButtonContainer();
+    if (container && this.isValidButtonContainer(container)) {
+      console.log('找到有效容器，添加按钮');
+      this.createAndInsertButtonToContainer(container);
     }
   }
 
@@ -125,18 +175,49 @@ class YouTubeTranscriptionExtractor {
     return isWatchPage || isLivePage;
   }
 
-  createAndInsertButton() {
-    // 寻找合适的位置插入按钮
-    const targetContainer = this.findButtonContainer();
-    if (!targetContainer) {
-      console.log('YouTube Transcription Extractor: 无法找到合适的容器');
-      return;
+  findButtonContainer() {
+    // 按优先级查找容器
+    const selectors = [
+      '#actions-inner #top-level-buttons-computed',
+      '#top-level-buttons-computed',
+      '#actions-inner',
+      '#actions #menu-container',
+      '#menu-container'
+    ];
+
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element && this.isValidButtonContainer(element)) {
+        return element;
+      }
     }
 
-    this.createAndInsertButtonToContainer(targetContainer);
+    // 通过已存在的按钮查找容器
+    const existingButtons = [
+      'button[aria-label*="like" i]',
+      'button[aria-label*="Share" i]', 
+      'button[aria-label*="Save" i]'
+    ];
+
+    for (const buttonSelector of existingButtons) {
+      const button = document.querySelector(buttonSelector);
+      if (button) {
+        const container = button.closest('#top-level-buttons-computed, #actions-inner, #menu-container');
+        if (container && this.isValidButtonContainer(container)) {
+          return container;
+        }
+      }
+    }
+
+    return null;
   }
 
   createAndInsertButtonToContainer(targetContainer) {
+    // 避免重复添加
+    if (this.button && document.contains(this.button)) {
+      return;
+    }
+
     // 创建按钮
     this.button = document.createElement('button');
     this.button.className = 'yt-transcript-extractor-btn';
@@ -153,64 +234,40 @@ class YouTubeTranscriptionExtractor {
     // 插入按钮
     targetContainer.appendChild(this.button);
     console.log('按钮成功插入到容器中');
+    
+    // 监听按钮是否被意外移除
+    this.monitorButtonPresence();
   }
 
-  findButtonContainer() {
-    console.log('开始查找合适的按钮容器...');
+  monitorButtonPresence() {
+    if (!this.button) return;
     
-    // 更精确的选择器，专门针对操作按钮区域
-    const selectors = [
-      // YouTube 2023+ 版本的操作按钮区域
-      '#actions-inner #top-level-buttons-computed',
-      '#top-level-buttons-computed',
-      
-      // 备用选择器
-      '#actions-inner',
-      '#actions #menu-container',
-      
-      // 通过寻找已知的操作按钮来定位容器
-      '.yt-spec-button-shape-next--icon-only-default', // 点赞按钮的父容器
-      '.ytd-menu-renderer[button-renderer] #top-level-buttons-computed',
-      
-      // 更通用的备用方案
-      '#menu-container',
-      '.style-scope.ytd-menu-renderer'
-    ];
-
-    for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      if (element) {
-        console.log('找到合适的容器:', selector);
-        
-        // 验证这是正确的操作按钮区域
-        if (this.isValidButtonContainer(element)) {
-          return element;
+    // 创建观察器监听按钮是否被移除
+    const buttonObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.removedNodes.length > 0) {
+          for (const node of mutation.removedNodes) {
+            if (node === this.button || (node.contains && node.contains(this.button))) {
+              console.log('检测到按钮被移除，尝试重新添加');
+              this.button = null;
+              buttonObserver.disconnect();
+              // 立即尝试重新添加
+              setTimeout(() => this.tryAddButton(), 100);
+              return;
+            }
+          }
         }
-      }
+      });
+    });
+
+    // 观察按钮的父容器
+    const buttonContainer = this.button.closest('#top-level-buttons-computed, #actions-inner, #menu-container') || this.button.parentElement;
+    if (buttonContainer) {
+      buttonObserver.observe(buttonContainer, {
+        childList: true,
+        subtree: true
+      });
     }
-
-    // 如果上述方法都失败，尝试通过已存在的按钮来找到容器
-    console.log('尝试通过已存在的按钮查找容器...');
-    const existingButtons = [
-      'button[aria-label*="like" i]', // 点赞按钮
-      'button[aria-label*="Share" i]', // 分享按钮
-      'button[aria-label*="Save" i]', // 保存按钮
-      'button[aria-label*="Thanks" i]' // 感谢按钮
-    ];
-
-    for (const buttonSelector of existingButtons) {
-      const button = document.querySelector(buttonSelector);
-      if (button) {
-        const container = button.closest('#top-level-buttons-computed, #actions-inner, #menu-container');
-        if (container) {
-          console.log('通过已存在按钮找到容器:', buttonSelector);
-          return container;
-        }
-      }
-    }
-
-    console.log('未找到合适的按钮容器');
-    return null;
   }
 
   isValidButtonContainer(element) {
