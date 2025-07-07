@@ -77,6 +77,95 @@
 
 ## 开发说明
 
+### 执行流程图
+
+```mermaid
+graph TD
+    A[页面加载] --> B[创建 YouTubeTranscriptionExtractor 实例]
+    B --> C[constructor 构造函数]
+    C --> D[setupDataCapture 设置数据捕获]
+    C --> E[init 初始化]
+    
+    D --> D1[监听 DOM 变化]
+    D --> D2[定期检查 window 对象]
+    D --> D3[提取脚本数据]
+    
+    E --> E1[setupGlobalDebugMethod 设置调试方法]
+    E --> E2[observePageChanges 监听页面变化]
+    E --> E3[startButtonContainerObserver 开始按钮容器观察]
+    
+    E2 --> F[监听 URL 变化]
+    E2 --> G[监听浏览器历史变化]
+    E2 --> H[监听 YouTube 事件]
+    
+    F --> I[页面变化检测]
+    G --> I
+    H --> I
+    I --> J[cleanupButton 清理旧按钮]
+    J --> E3
+    
+    E3 --> K{是否为视频页面?}
+    K -->|否| L[结束]
+    K -->|是| M[tryAddButton 尝试添加按钮]
+    
+    M --> N{按钮是否已存在?}
+    N -->|是| O[结束]
+    N -->|否| P[findButtonContainer 查找按钮容器]
+    
+    P --> Q{找到有效容器?}
+    Q -->|否| R[等待容器出现]
+    R --> P
+    Q -->|是| S[createAndInsertButtonToContainer 创建并插入按钮]
+    
+    S --> T[创建按钮元素]
+    T --> U[添加点击事件监听]
+    U --> V[插入到容器]
+    V --> W[monitorButtonPresence 监听按钮状态]
+    
+    U --> X[用户点击按钮]
+    X --> Y[extractTranscription 提取转录]
+    Y --> Z[updateButtonState 更新按钮状态为 processing]
+    Z --> AA[getTranscription 获取转录]
+    
+    AA --> BB[quickExtractTranscript 快速提取转录]
+    BB --> CC[expandDescription 展开描述]
+    CC --> DD[findVisibleTranscriptButton 查找转录按钮]
+    
+    DD --> EE{找到转录按钮?}
+    EE -->|否| FF[显示错误通知]
+    EE -->|是| GG[点击转录按钮]
+    
+    GG --> HH[等待转录面板加载]
+    HH --> II[extractTranscriptionContent 提取转录内容]
+    
+    II --> JJ[查找转录段落元素]
+    JJ --> KK[提取并清理文本]
+    KK --> LL[合并转录段落]
+    
+    LL --> MM{转录获取成功?}
+    MM -->|是| NN[copyToClipboard 复制到剪贴板]
+    MM -->|否| OO[showDebugInfo 显示调试信息]
+    
+    NN --> PP[showNotification 显示成功通知]
+    OO --> QQ[showNotification 显示错误通知]
+    
+    PP --> RR[updateButtonState 恢复按钮状态]
+    QQ --> RR
+    FF --> RR
+    
+    RR --> SS[流程结束]
+    
+    classDef initClass fill:#e1f5fe
+    classDef processClass fill:#f3e5f5
+    classDef uiClass fill:#e8f5e8
+    classDef errorClass fill:#ffebee
+    
+    class A,B,C,D,E initClass
+    class Y,Z,AA,BB,CC,DD,GG,HH,II,JJ,KK,LL processClass
+    class M,N,P,Q,S,T,U,V,W,X uiClass
+    class FF,OO,QQ errorClass
+```
+
 ### 主要组件
 
 1. **YouTubeTranscriptionExtractor 类**
@@ -84,15 +173,41 @@
    - 监听页面变化
    - 管理用户界面
 
-2. **转录获取方法**
-   - `fetchTranscriptionFromAPI()`: 从 API 获取
-   - `getTranscriptionFromPage()`: 从页面获取
-   - `parseTranscriptionXML()`: 解析 XML 转录数据
+2. **核心方法说明**
+   - `setupDataCapture()`: 设置数据捕获机制，监听 DOM 变化和脚本注入
+   - `observePageChanges()`: 监听页面变化，支持 SPA 导航
+   - `startButtonContainerObserver()`: 智能检测按钮容器出现时机
+   - `tryAddButton()`: 动态添加转录按钮到合适位置
+   - `extractTranscription()`: 主要的转录提取流程
+   - `quickExtractTranscript()`: 快速转录提取策略
+   - `extractTranscriptionContent()`: 从页面提取转录内容
 
 3. **用户界面**
    - 自适应按钮设计
    - 通知系统
-   - 错误处理
+   - 错误处理和调试信息
+
+### 关键技术实现
+
+#### 页面变化监听
+- 使用 MutationObserver 监听 DOM 变化
+- 监听 `popstate` 事件和 YouTube 自定义事件
+- 支持单页应用的路由变化
+
+#### 按钮智能插入
+- 多种容器查找策略
+- 按钮有效性验证
+- 自动重新插入机制
+
+#### 转录提取策略
+- 优先尝试页面方法（模拟点击）
+- 多种转录内容选择器
+- 智能文本清理和时间戳处理
+
+#### 错误处理
+- 详细的调试信息输出
+- 用户友好的错误提示
+- 全局调试方法支持
 
 ### 自定义样式
 
