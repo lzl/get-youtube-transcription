@@ -4,6 +4,8 @@ class YouTubeTranscriptionExtractor {
     this.button = null;
     this.isProcessing = false;
     this.buttonContainerObserver = null;
+    this.capturedData = null;
+    this.setupDataCapture();
     this.init();
   }
 
@@ -14,6 +16,89 @@ class YouTubeTranscriptionExtractor {
     this.observePageChanges();
     // 立即尝试添加按钮
     this.startButtonContainerObserver();
+  }
+  
+  setupDataCapture() {
+    console.log('设置数据捕获机制...');
+    
+    // 方法1: 监听 DOM 变化以捕获脚本注入的数据
+    const scriptObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeName === 'SCRIPT' && node.textContent) {
+              this.extractDataFromScript(node.textContent);
+            }
+          }
+        }
+      }
+    });
+    
+    scriptObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+    
+    // 方法2: 定期检查 window 对象
+    const checkInterval = setInterval(() => {
+      if (window.ytInitialPlayerResponse && !this.capturedData) {
+        this.capturedData = window.ytInitialPlayerResponse;
+        console.log('从 window 对象捕获到 ytInitialPlayerResponse');
+        clearInterval(checkInterval);
+      }
+    }, 100);
+    
+    // 10秒后停止检查
+    setTimeout(() => clearInterval(checkInterval), 10000);
+  }
+  
+  extractDataFromScript(scriptContent) {
+    // 提取 ytInitialPlayerResponse
+    if (scriptContent.includes('ytInitialPlayerResponse') && !window.ytInitialPlayerResponse) {
+      const patterns = [
+        /window\["ytInitialPlayerResponse"\]\s*=\s*({.+?});/,
+        /ytInitialPlayerResponse\s*=\s*({.+?});/,
+        /var\s+ytInitialPlayerResponse\s*=\s*({.+?});/
+      ];
+      
+      for (const pattern of patterns) {
+        const match = scriptContent.match(pattern);
+        if (match) {
+          try {
+            const data = JSON.parse(match[1]);
+            window.ytInitialPlayerResponse = data;
+            this.capturedData = data;
+            console.log('成功从脚本中提取 ytInitialPlayerResponse');
+            break;
+          } catch (e) {
+            console.error('解析 ytInitialPlayerResponse 失败:', e);
+          }
+        }
+      }
+    }
+    
+    // 提取 ytInitialData
+    if (scriptContent.includes('ytInitialData') && !window.ytInitialData) {
+      const patterns = [
+        /window\["ytInitialData"\]\s*=\s*({.+?});/,
+        /ytInitialData\s*=\s*({.+?});/,
+        /var\s+ytInitialData\s*=\s*({.+?});/
+      ];
+      
+      for (const pattern of patterns) {
+        const match = scriptContent.match(pattern);
+        if (match) {
+          try {
+            const data = JSON.parse(match[1]);
+            window.ytInitialData = data;
+            console.log('成功从脚本中提取 ytInitialData');
+            break;
+          } catch (e) {
+            console.error('解析 ytInitialData 失败:', e);
+          }
+        }
+      }
+    }
   }
 
   observePageChanges() {
@@ -323,28 +408,69 @@ class YouTubeTranscriptionExtractor {
 
   showDebugInfo() {
     console.log('=== 调试信息 ===');
-    console.log('ytInitialPlayerResponse 存在:', !!window.ytInitialPlayerResponse);
-    console.log('captions 数据:', window.ytInitialPlayerResponse?.captions);
     
-    // 检查页面上是否有转录按钮
-    const transcriptButtons = document.querySelectorAll('[aria-label*="Transcript"], [aria-label*="转录"], button');
-    console.log('页面上找到的可能的转录按钮数量:', transcriptButtons.length);
+    // 1. 检查 YouTube 数据
+    console.log('--- YouTube 数据检查 ---');
+    console.log('ytInitialPlayerResponse 存在:', !!window.ytInitialPlayerResponse);
+    console.log('ytInitialData 存在:', !!window.ytInitialData);
+    console.log('ytplayer 存在:', !!window.ytplayer);
+    
+    if (window.ytInitialPlayerResponse?.captions) {
+      const tracks = window.ytInitialPlayerResponse.captions.playerCaptionsTracklistRenderer?.captionTracks;
+      console.log('字幕轨道数量:', tracks?.length || 0);
+      if (tracks) {
+        tracks.forEach((track, i) => {
+          console.log(`  轨道 ${i + 1}: ${track.languageCode} - ${track.name?.simpleText || '未命名'}`);
+        });
+      }
+    } else {
+      console.log('没有找到字幕数据');
+    }
+    
+    // 2. 检查转录按钮
+    console.log('\n--- 转录按钮检查 ---');
+    const transcriptButtons = document.querySelectorAll('[aria-label*="Transcript"], [aria-label*="转录"], [aria-label*="transcript"]');
+    console.log('找到的转录按钮数量:', transcriptButtons.length);
     
     transcriptButtons.forEach((btn, index) => {
-      if (btn.textContent?.toLowerCase().includes('transcript') || 
-          btn.textContent?.includes('转录') ||
-          btn.getAttribute('aria-label')?.toLowerCase().includes('transcript')) {
-        console.log(`转录按钮 ${index}:`, {
-          text: btn.textContent,
-          ariaLabel: btn.getAttribute('aria-label'),
-          visible: btn.offsetParent !== null
+      const ariaLabel = btn.getAttribute('aria-label') || '';
+      const text = btn.textContent?.trim() || '';
+      if (ariaLabel.toLowerCase().includes('transcript') || text.toLowerCase().includes('transcript')) {
+        console.log(`  按钮 ${index + 1}:`, {
+          text: text.substring(0, 50),
+          ariaLabel: ariaLabel,
+          visible: btn.offsetParent !== null,
+          className: btn.className
         });
       }
     });
     
-    // 检查是否有转录面板
-    const transcriptPanels = document.querySelectorAll('[class*="transcript"], [id*="transcript"]');
-    console.log('页面上的转录相关元素数量:', transcriptPanels.length);
+    // 3. 检查转录面板
+    console.log('\n--- 转录面板检查 ---');
+    const transcriptPanels = document.querySelectorAll('ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-transcript"]');
+    console.log('转录面板存在:', transcriptPanels.length > 0);
+    
+    const transcriptSegments = document.querySelectorAll('ytd-transcript-segment-renderer');
+    console.log('转录段落数量:', transcriptSegments.length);
+    
+    if (transcriptSegments.length > 0) {
+      console.log('前 3 个段落内容:');
+      Array.from(transcriptSegments).slice(0, 3).forEach((seg, i) => {
+        const text = seg.textContent?.trim().substring(0, 100);
+        console.log(`  段落 ${i + 1}: ${text}...`);
+      });
+    }
+    
+    // 4. 检查可能的错误
+    console.log('\n--- 可能的问题 ---');
+    const hasAdBlocker = !!document.querySelector('.adblock-whitelist-messagebox');
+    console.log('广告拦截器干扰:', hasAdBlocker);
+    
+    const isMiniplayer = !!document.querySelector('ytd-miniplayer[active]');
+    console.log('迷你播放器模式:', isMiniplayer);
+    
+    const isEmbedded = window.location.pathname.includes('embed');
+    console.log('嵌入式播放器:', isEmbedded);
     
          console.log('如果问题持续，请打开浏览器开发者工具查看详细日志');
      console.log('你也可以在控制台运行 window.ytTranscriptDebug() 来手动检查转录面板');
@@ -390,27 +516,16 @@ class YouTubeTranscriptionExtractor {
    }
 
   async getTranscription() {
-    // 方法1：尝试从 YouTube 的内部 API 获取转录
     try {
-      const videoId = this.getVideoId();
-      const transcription = await this.fetchTranscriptionFromAPI(videoId);
+      console.log('开始获取转录...');
+      const transcription = await this.quickExtractTranscript();
       if (transcription) {
         return transcription;
       }
     } catch (error) {
-      console.log('API 方法失败，尝试其他方法:', error);
+      console.log('获取转录失败:', error);
     }
-
-    // 方法2：尝试从页面中的转录面板获取
-    try {
-      const transcription = await this.getTranscriptionFromPage();
-      if (transcription) {
-        return transcription;
-      }
-    } catch (error) {
-      console.log('页面方法失败:', error);
-    }
-
+    
     return null;
   }
 
@@ -429,323 +544,132 @@ class YouTubeTranscriptionExtractor {
     return null;
   }
 
-  async fetchTranscriptionFromAPI(videoId) {
-    console.log('尝试从 API 获取转录，视频ID:', videoId);
-    
-    try {
-      // 获取页面上的必要信息
-      const ytInitialData = window.ytInitialData;
-      const ytInitialPlayerResponse = window.ytInitialPlayerResponse;
-      
-      console.log('ytInitialPlayerResponse 存在:', !!ytInitialPlayerResponse);
-      console.log('captions 存在:', !!(ytInitialPlayerResponse?.captions));
 
-      if (ytInitialPlayerResponse && ytInitialPlayerResponse.captions) {
-        const captionTracks = ytInitialPlayerResponse.captions.playerCaptionsTracklistRenderer?.captionTracks;
-        
-        console.log('找到的字幕轨道数量:', captionTracks?.length || 0);
-        
-        if (captionTracks && captionTracks.length > 0) {
-          // 打印所有可用的字幕轨道信息
-          captionTracks.forEach((track, index) => {
-            console.log(`字幕轨道 ${index}:`, {
-              language: track.languageCode,
-              name: track.name?.simpleText,
-              kind: track.kind,
-              isTranslatable: track.isTranslatable
-            });
-          });
-          
-          // 选择字幕轨道的策略：
-          // 1. 优先选择非翻译的原始字幕（kind 为 undefined 或 null）
-          // 2. 如果没有原始字幕，选择第一个可用的
-          let selectedTrack = captionTracks.find(track => !track.kind && !track.isTranslatable) || 
-                             captionTracks.find(track => !track.kind) || 
-                             captionTracks[0];
-          
-          console.log('选择的字幕轨道:', {
-            language: selectedTrack.languageCode,
-            name: selectedTrack.name?.simpleText,
-            kind: selectedTrack.kind,
-            hasBaseUrl: !!selectedTrack.baseUrl
-          });
-          
-          if (selectedTrack && selectedTrack.baseUrl) {
-            console.log('开始获取字幕内容...');
-            const response = await fetch(selectedTrack.baseUrl);
-            
-            if (!response.ok) {
-              console.error('字幕请求失败:', response.status, response.statusText);
-              return null;
-            }
-            
-            const xmlText = await response.text();
-            console.log('获取到 XML 内容长度:', xmlText.length);
-            
-            const transcription = this.parseTranscriptionXML(xmlText);
-            if (transcription) {
-              console.log('API 方法成功获取转录，长度:', transcription.length);
-              return transcription;
-            }
-          }
-        } else {
-          console.log('未找到字幕轨道');
-        }
-      } else {
-        console.log('页面数据中未找到字幕信息');
-      }
-    } catch (error) {
-      console.error('API 获取失败:', error);
-    }
 
-    return null;
-  }
 
-  parseTranscriptionXML(xmlText) {
-    try {
-      console.log('开始解析 XML 转录内容...');
-      
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-      
-      // 检查是否有解析错误
-      const errorNode = xmlDoc.querySelector('parsererror');
-      if (errorNode) {
-        console.error('XML 解析错误:', errorNode.textContent);
-        return null;
-      }
-      
-      const textElements = xmlDoc.querySelectorAll('text');
-      console.log('找到的文本元素数量:', textElements.length);
-      
-      if (textElements.length === 0) {
-        console.log('未找到 text 元素，尝试其他标签...');
-        // 尝试其他可能的标签名
-        const alternativeTags = ['p', 'span', 'div', 'caption'];
-        for (const tag of alternativeTags) {
-          const elements = xmlDoc.querySelectorAll(tag);
-          if (elements.length > 0) {
-            console.log(`找到 ${elements.length} 个 ${tag} 元素`);
-            const segments = [];
-            
-            for (const element of elements) {
-              const text = this.decodeHTMLEntities(element.textContent.trim());
-              const startTime = element.getAttribute('start') || element.getAttribute('t');
-              
-              if (text.length > 0) {
-                if (startTime) {
-                  segments.push(`${this.formatTime(startTime)}: ${text}`);
-                } else {
-                  segments.push(text);
-                }
-              }
-            }
-            
-            if (segments.length > 0) {
-              // 去重并返回结果
-              return [...new Set(segments)].join('\n');
-            }
-          }
-        }
-        return null;
-      }
-      
-      const segments = [];
-      
-      for (const element of textElements) {
-        // 解码 HTML 实体
-        const text = this.decodeHTMLEntities(element.textContent.trim());
-        const startTime = element.getAttribute('start') || element.getAttribute('t');
-        
-        if (text.length > 0) {
-          if (startTime) {
-            segments.push(`${this.formatTime(startTime)}: ${text}`);
-          } else {
-            segments.push(text);
-          }
-        }
-      }
+  
 
-      if (segments.length > 0) {
-        // 去重并返回结果
-        const uniqueSegments = [...new Set(segments)];
-        console.log('解析完成，转录段落数:', uniqueSegments.length);
-        return uniqueSegments.join('\n');
-      }
-      
-      return null;
-      
-    } catch (error) {
-      console.error('XML 解析失败:', error);
-      return null;
-    }
-  }
-
-  // 修改格式化时间戳的方法，确保格式正确
-  formatTime(seconds) {
-    const sec = parseFloat(seconds);
-    const hours = Math.floor(sec / 3600);
-    const minutes = Math.floor((sec % 3600) / 60);
-    const remainingSeconds = Math.floor(sec % 60);
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    } else {
-      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-  }
-
-  decodeHTMLEntities(text) {
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  }
-
-  async getTranscriptionFromPage() {
-    // 尝试打开转录面板并获取转录
-    console.log('开始尝试从页面获取转录...');
-    
-    // 更全面的转录按钮选择器
-    const transcriptSelectors = [
-      '[aria-label*="Transcript"]',
-      '[aria-label*="转录"]', 
-      '[aria-label*="字幕"]',
-      'button[aria-label*="transcript" i]',
-      'button[aria-label*="show transcript" i]',
-      'ytd-button-renderer[aria-label*="transcript" i]',
-      // 新增：通过图标和文本内容查找
-      'button:has(span:contains("Transcript"))',
-      'button:has(span:contains("转录"))',
-      // 通过 yt-formatted-string 查找
-      'yt-formatted-string:contains("Transcript")',
-      'yt-formatted-string:contains("转录")'
-    ];
-    
-    let transcriptButton = null;
-    for (const selector of transcriptSelectors) {
-      transcriptButton = document.querySelector(selector);
-      if (transcriptButton) {
-        console.log('找到转录按钮:', selector);
-        break;
-      }
-    }
-    
-    // 如果没找到转录按钮，尝试通过文本内容查找
-    if (!transcriptButton) {
-      const allButtons = document.querySelectorAll('button, yt-button-renderer, ytd-button-renderer');
-      for (const button of allButtons) {
-        const text = button.textContent?.toLowerCase() || '';
-        const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-        if (text.includes('transcript') || text.includes('转录') || 
-            ariaLabel.includes('transcript') || ariaLabel.includes('转录')) {
-          transcriptButton = button;
-          console.log('通过文本内容找到转录按钮');
-          break;
-        }
-      }
-    }
-    
-    if (transcriptButton) {
-      console.log('点击转录按钮...');
-      // 点击转录按钮
-      transcriptButton.click();
-      
-      // 等待转录面板加载 - 增加等待时间
-      console.log('等待转录面板加载...');
-      await this.sleep(2000); // 等待2秒让面板加载
-      
-      // 尝试多种方式获取转录内容
-      let transcription = await this.extractTranscriptionContent();
-      
-      if (transcription) {
-        console.log('成功获取转录:', transcription.substring(0, 100) + '...');
-        return transcription;
-      } else {
-        console.log('转录面板已打开，但未能获取内容');
-      }
-    } else {
-      console.log('未找到转录按钮');
-    }
-
-    return null;
-  }
 
   async extractTranscriptionContent() {
     console.log('开始提取转录内容...');
     
+    // 等待内容加载
+    await this.sleep(1000);
+    
+    // 检查转录面板是否已打开
+    const transcriptPanel = document.querySelector('ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-transcript"]');
+    if (transcriptPanel) {
+      console.log('找到转录面板');
+    }
+    
     // 尝试多种选择器来获取转录内容
     const contentSelectors = [
-      // 新的转录面板选择器
-      'ytd-transcript-renderer',
-      'ytd-transcript-segment-list-renderer',
-      '#segments.ytd-transcript-segment-list-renderer',
-      // 转录段落选择器
-      'ytd-transcript-body-renderer'
+      // 最新的 YouTube 转录选择器
+      'ytd-transcript-segment-list-renderer ytd-transcript-segment-renderer',
+      'ytd-transcript-renderer ytd-transcript-segment-renderer',
+      // 旧版选择器
+      'ytd-transcript-body-renderer ytd-transcript-segment-renderer',
+      // 备用选择器
+      '.ytd-transcript-segment-renderer'
     ];
 
-    for (const selector of contentSelectors) {
-      console.log('尝试选择器:', selector);
-      const container = document.querySelector(selector);
+    // 直接查找所有转录段落元素
+    let segmentElements = document.querySelectorAll('ytd-transcript-segment-renderer');
+    console.log(`在整个页面找到 ${segmentElements.length} 个转录段落元素`);
+    
+    if (segmentElements.length > 0) {
+      const transcriptSegments = [];
       
-      if (container) {
-        console.log('找到容器:', selector);
-        
-        // 查找所有转录段落元素
-        const segmentElements = container.querySelectorAll('ytd-transcript-segment-renderer');
-        
-        if (segmentElements.length > 0) {
-          console.log('找到转录段落:', segmentElements.length);
+      for (const segment of segmentElements) {
+        try {
+          // 方法1: 查找 segment-text 类
+          let textContent = '';
+          const segmentText = segment.querySelector('.segment-text');
+          if (segmentText) {
+            textContent = segmentText.textContent || segmentText.innerText || '';
+            console.log('从 .segment-text 获取文本');
+          }
           
-          const transcriptSegments = [];
-          
-          for (const segment of segmentElements) {
-            try {
-              // 获取时间戳 - 从子元素中查找
-              const timestampElement = segment.querySelector('[data-start-time]');
-              const timestamp = timestampElement?.getAttribute('data-start-time');
-              
-              // 获取文本内容 - 从段落的文本部分获取
-              const textElement = segment.querySelector('.segment-text, ytd-transcript-segment-renderer .text, .ytd-transcript-segment-renderer');
-              let textContent = '';
-              
-              if (textElement) {
-                textContent = this.cleanTranscriptText(textElement.textContent || textElement.innerText || '');
-              } else {
-                // 如果没有找到特定的文本元素，从整个段落获取
-                textContent = this.cleanTranscriptText(segment.textContent || segment.innerText || '');
-                // 移除可能包含的时间戳文本
-                textContent = textContent.replace(/^\d+:\d+\s*/, '').trim();
+          // 方法2: 查找包含文本的 span
+          if (!textContent) {
+            const spans = segment.querySelectorAll('span');
+            for (const span of spans) {
+              const text = span.textContent || span.innerText || '';
+              // 过滤时间戳文本
+              if (text && !text.match(/^\d+:\d+$/)) {
+                textContent = text;
+                console.log('从 span 获取文本');
+                break;
               }
-              
-              console.log('段落处理:', {
-                timestamp,
-                textLength: textContent.length,
-                textPreview: textContent.substring(0, 50) + '...'
-              });
-              
-              if (textContent && textContent.length > 0) {
-                if (timestamp) {
-                  const formattedTime = this.formatTime(timestamp);
-                  transcriptSegments.push(`${formattedTime}: ${textContent}`);
-                } else {
-                  transcriptSegments.push(textContent);
-                }
-              }
-            } catch (error) {
-              console.log('处理段落时出错:', error);
-              continue;
             }
           }
           
-          if (transcriptSegments.length > 0) {
-            console.log('成功提取转录段落:', transcriptSegments.length);
-            return transcriptSegments.join('\n');
+          // 方法3: 获取整个 segment 的文本
+          if (!textContent) {
+            textContent = segment.textContent || segment.innerText || '';
+            // 移除时间戳
+            textContent = textContent.replace(/^\d+:\d+\s*/, '').trim();
+            console.log('从整个 segment 获取文本');
+          }
+          
+          // 清理文本
+          textContent = this.cleanTranscriptText(textContent);
+          
+          // 获取时间戳
+          let timestamp = null;
+          const timestampElement = segment.querySelector('[data-start-time]');
+          if (timestampElement) {
+            timestamp = timestampElement.getAttribute('data-start-time');
+          } else {
+            // 尝试从文本中提取时间戳
+            const timeMatch = segment.textContent.match(/^(\d+:\d+)/);
+            if (timeMatch) {
+              timestamp = timeMatch[1];
+            }
+          }
+          
+          console.log(`段落: 时间=${timestamp}, 文本长度=${textContent.length}`);
+          
+          if (textContent && textContent.length > 0) {
+            if (timestamp) {
+              transcriptSegments.push(`${timestamp}: ${textContent}`);
+            } else {
+              transcriptSegments.push(textContent);
+            }
+          }
+        } catch (error) {
+          console.error('处理段落时出错:', error);
+          continue;
+        }
+      }
+      
+      if (transcriptSegments.length > 0) {
+        console.log(`成功提取 ${transcriptSegments.length} 个转录段落`);
+        return transcriptSegments.join('\n');
+      }
+    }
+    
+    // 如果没有找到标准的 segment 元素，尝试其他方法
+    console.log('尝试备用提取方法...');
+    
+    for (const selector of contentSelectors) {
+      console.log(`尝试选择器: ${selector}`);
+      const elements = document.querySelectorAll(selector);
+      
+      if (elements.length > 0) {
+        console.log(`找到 ${elements.length} 个元素`);
+        const transcriptSegments = [];
+        
+        for (const element of elements) {
+          const text = this.cleanTranscriptText(element.textContent || element.innerText || '');
+          if (text && text.length > 0) {
+            transcriptSegments.push(text);
           }
         }
         
         // 如果没有找到标准的segment元素，尝试其他方式
         console.log('尝试其他提取方式...');
-        const allTimestampElements = container.querySelectorAll('[data-start-time]');
+        const allTimestampElements = document.querySelectorAll('[data-start-time]');
         
         if (allTimestampElements.length > 0) {
           console.log('找到时间戳元素:', allTimestampElements.length);
@@ -774,8 +698,7 @@ class YouTubeTranscriptionExtractor {
               }
               
               if (textContent && textContent.length > 0) {
-                const formattedTime = this.formatTime(timestamp);
-                transcriptSegments.push(`${formattedTime}: ${textContent}`);
+                transcriptSegments.push(`${timestamp}: ${textContent}`);
               }
             } catch (error) {
               console.log('处理时间戳元素时出错:', error);
@@ -808,6 +731,140 @@ class YouTubeTranscriptionExtractor {
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+  
+  async quickExtractTranscript() {
+    console.log('开始快速提取转录...');
+    
+    // 先尝试打开描述区域，转录按钮可能在那里
+    await this.expandDescription();
+    
+    // 查找所有可能的转录按钮
+    const transcriptButton = await this.findVisibleTranscriptButton();
+    
+    if (!transcriptButton) {
+      console.log('未找到可见的转录按钮');
+      return null;
+    }
+    
+    console.log('找到转录按钮，点击...');
+    transcriptButton.click();
+    
+    // 等待面板加载
+    await this.sleep(2000);
+    
+    // 提取转录内容
+    return await this.extractTranscriptionContent();
+  }
+  
+  async expandDescription() {
+    console.log('展开视频描述...');
+    
+    // 查找展开描述的按钮
+    const expandButtons = [
+      'tp-yt-paper-button#expand',
+      'tp-yt-paper-button.ytd-video-secondary-info-renderer',
+      '#description tp-yt-paper-button',
+      '[id="more"]:not([hidden])',
+      'ytd-text-inline-expander #expand'
+    ];
+    
+    for (const selector of expandButtons) {
+      const button = document.querySelector(selector);
+      if (button && button.offsetParent !== null && !button.hidden) {
+        console.log(`点击展开按钮: ${selector}`);
+        button.click();
+        await this.sleep(500);
+        break;
+      }
+    }
+  }
+  
+  async findVisibleTranscriptButton() {
+    console.log('查找可见的转录按钮...');
+    
+    // 多种查找策略
+    const strategies = [
+      // 策略1: 在描述区域查找
+      () => {
+        const descButtons = document.querySelectorAll('#description button, #description-inner button');
+        for (const btn of descButtons) {
+          if (this.isTranscriptButton(btn) && this.isElementVisible(btn)) {
+            console.log('在描述区域找到转录按钮');
+            return btn;
+          }
+        }
+        return null;
+      },
+      
+      // 策略2: 在视频下方的按钮区域查找
+      () => {
+        const actionButtons = document.querySelectorAll('ytd-video-primary-info-renderer button');
+        for (const btn of actionButtons) {
+          if (this.isTranscriptButton(btn) && this.isElementVisible(btn)) {
+            console.log('在主要信息区找到转录按钮');
+            return btn;
+          }
+        }
+        return null;
+      },
+      
+      // 策略3: 全局查找
+      () => {
+        const allButtons = document.querySelectorAll('button:not([aria-label*="Close"]):not([aria-label*="关闭"])');
+        for (const btn of allButtons) {
+          if (this.isTranscriptButton(btn) && this.isElementVisible(btn)) {
+            console.log('在页面中找到转录按钮');
+            return btn;
+          }
+        }
+        return null;
+      }
+    ];
+    
+    // 依次尝试每种策略
+    for (const strategy of strategies) {
+      const button = strategy();
+      if (button) {
+        return button;
+      }
+    }
+    
+    return null;
+  }
+  
+  isTranscriptButton(button) {
+    const text = (button.textContent || '').toLowerCase();
+    const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
+    
+    return (text.includes('transcript') || 
+            text.includes('转录') || 
+            text.includes('字幕') ||
+            ariaLabel.includes('transcript') ||
+            ariaLabel.includes('转录') ||
+            ariaLabel.includes('字幕'));
+  }
+  
+  isElementVisible(element) {
+    if (!element) return false;
+    
+    // 检查元素是否可见
+    if (element.offsetParent === null) return false;
+    if (element.offsetWidth === 0 || element.offsetHeight === 0) return false;
+    if (window.getComputedStyle(element).display === 'none') return false;
+    if (window.getComputedStyle(element).visibility === 'hidden') return false;
+    
+    // 检查元素是否在视口内
+    const rect = element.getBoundingClientRect();
+    const inViewport = rect.top >= 0 && 
+                       rect.left >= 0 && 
+                       rect.bottom <= window.innerHeight && 
+                       rect.right <= window.innerWidth;
+    
+    // 元素可能在视口下方，但仍然可用
+    return element.offsetParent !== null && (inViewport || rect.top > 0);
+  }
+  
+
 
   waitForElement(selector, timeout = 5000) {
     return new Promise((resolve, reject) => {
