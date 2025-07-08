@@ -537,6 +537,24 @@ class YoutubeTranscriptionExtension {
     let text = '';
     let timestamp = null;
     
+    // Extract timestamp first
+    const timestampElement = segment.querySelector('[data-start-time], .segment-timestamp, [role="button"]');
+    if (timestampElement) {
+      // Try to get timestamp from data attribute first
+      const dataStartTime = timestampElement.getAttribute('data-start-time');
+      if (dataStartTime) {
+        timestamp = this.formatTimestamp(dataStartTime.trim());
+      } else {
+        // If no data attribute, extract from text content
+        // The timestamp is usually at the beginning of the text
+        const fullText = timestampElement.textContent || '';
+        const timestampMatch = fullText.match(/^\s*(\d+:\d+(?::\d+)?)\s*/);
+        if (timestampMatch) {
+          timestamp = timestampMatch[1];
+        }
+      }
+    }
+    
     // Extract text content
     const textSelectors = ['.segment-text', 'span:not([class*="timestamp"])'];
     for (const selector of textSelectors) {
@@ -550,21 +568,14 @@ class YoutubeTranscriptionExtension {
     // Fallback: get text from entire segment
     if (!text) {
       text = segment.textContent || '';
-    }
-    
-    // Extract timestamp
-    const timestampElement = segment.querySelector('[data-start-time], .segment-timestamp, [role="button"]');
-    if (timestampElement) {
-      const startTime = timestampElement.getAttribute('data-start-time') || 
-                       timestampElement.textContent || '';
-      timestamp = this.formatTimestamp(startTime);
+      // Remove timestamp from the beginning if present
+      if (timestamp) {
+        text = text.replace(new RegExp(`^\\s*${timestamp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`), '');
+      }
     }
     
     // Clean up text
     text = this.cleanTranscriptText(text);
-    if (timestamp && text.startsWith(timestamp)) {
-      text = text.substring(timestamp.length).trim();
-    }
     
     return { text, timestamp };
   }
