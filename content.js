@@ -617,16 +617,66 @@ class YouTubeTranscriptionExtractor {
           
           // 获取时间戳
           let timestamp = null;
-          const timestampElement = segment.querySelector('[data-start-time]');
-          if (timestampElement) {
-            timestamp = timestampElement.getAttribute('data-start-time');
-          } else {
-            // 尝试从文本中提取时间戳
+          
+          // 尝试多种方式查找时间戳元素
+          const timestampSelectors = [
+            '[data-start-time]',
+            '.segment-timestamp',
+            'ytd-transcript-segment-renderer [role="button"]',
+            'ytd-transcript-segment-renderer button',
+            '.ytd-transcript-segment-renderer [tabindex]',
+            '.segment-start-offset'
+          ];
+          
+          let timestampElement = null;
+          let startTime = null;
+          
+          for (const selector of timestampSelectors) {
+            timestampElement = segment.querySelector(selector);
+            if (timestampElement) {
+              console.log(`找到时间戳元素，使用选择器: ${selector}`);
+              // 尝试从不同属性获取时间戳
+              startTime = timestampElement.getAttribute('data-start-time') ||
+                         timestampElement.getAttribute('data-start') ||
+                         timestampElement.getAttribute('aria-label') ||
+                         timestampElement.textContent;
+              
+              if (startTime) {
+                startTime = startTime.trim(); // 去掉前后空格和换行符
+                console.log('原始时间戳数据:', startTime);
+                break;
+              }
+            }
+          }
+          
+          if (startTime) {
+            // 如果是 aria-label，可能需要从中提取时间
+            if (startTime.includes('秒') || startTime.includes('分') || startTime.includes('时')) {
+              // 处理中文时间格式
+              const timeMatch = startTime.match(/(\d+)分(\d+)秒/);
+              if (timeMatch) {
+                const minutes = parseInt(timeMatch[1]);
+                const seconds = parseInt(timeMatch[2]);
+                timestamp = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+              }
+            } else if (startTime.includes(':')) {
+              // 已经是格式化的时间戳
+              timestamp = startTime;
+            } else {
+              // 数字秒数
+              timestamp = this.formatTimestamp(startTime);
+            }
+          }
+          
+          // 如果还是没找到，尝试从文本中提取时间戳
+          if (!timestamp) {
             const timeMatch = segment.textContent.match(/^(\d+:\d+)/);
             if (timeMatch) {
               timestamp = timeMatch[1];
             }
           }
+          
+          console.log(`段落时间戳结果: ${timestamp}`)
           
           console.log(`段落: 时间=${timestamp}, 文本长度=${textContent.length}`);
           
@@ -669,16 +719,62 @@ class YouTubeTranscriptionExtractor {
         
         // 如果没有找到标准的segment元素，尝试其他方式
         console.log('尝试其他提取方式...');
-        const allTimestampElements = document.querySelectorAll('[data-start-time]');
+        
+        // 使用多种选择器查找时间戳元素
+        const timestampSelectors = [
+          '[data-start-time]',
+          '.segment-timestamp',
+          'ytd-transcript-segment-renderer [role="button"]',
+          'ytd-transcript-segment-renderer button',
+          '.ytd-transcript-segment-renderer [tabindex]',
+          '.segment-start-offset'
+        ];
+        
+        const allTimestampElements = [];
+        for (const selector of timestampSelectors) {
+          const elements = document.querySelectorAll(selector);
+          if (elements.length > 0) {
+            console.log(`找到时间戳元素 ${elements.length} 个，使用选择器: ${selector}`);
+            allTimestampElements.push(...elements);
+            break; // 找到一种有效的选择器就使用它
+          }
+        }
         
         if (allTimestampElements.length > 0) {
-          console.log('找到时间戳元素:', allTimestampElements.length);
+          console.log('总共找到时间戳元素:', allTimestampElements.length);
           
           const transcriptSegments = [];
           
           for (const timestampElement of allTimestampElements) {
             try {
-              const timestamp = timestampElement.getAttribute('data-start-time');
+              // 尝试从多个属性获取时间戳
+              let startTime = timestampElement.getAttribute('data-start-time') ||
+                             timestampElement.getAttribute('data-start') ||
+                             timestampElement.getAttribute('aria-label') ||
+                             timestampElement.textContent;
+              
+              if (startTime) {
+                startTime = startTime.trim(); // 去掉前后空格和换行符
+              }
+              
+              let timestamp = null;
+              if (startTime) {
+                if (startTime.includes('秒') || startTime.includes('分') || startTime.includes('时')) {
+                  // 处理中文时间格式
+                  const timeMatch = startTime.match(/(\d+)分(\d+)秒/);
+                  if (timeMatch) {
+                    const minutes = parseInt(timeMatch[1]);
+                    const seconds = parseInt(timeMatch[2]);
+                    timestamp = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                  }
+                } else if (startTime.includes(':')) {
+                  // 已经是格式化的时间戳
+                  timestamp = startTime;
+                } else {
+                  // 数字秒数
+                  timestamp = this.formatTimestamp(startTime);
+                }
+              }
               
               // 查找对应的文本内容
               let textContent = '';
@@ -698,7 +794,11 @@ class YouTubeTranscriptionExtractor {
               }
               
               if (textContent && textContent.length > 0) {
-                transcriptSegments.push(`${timestamp}: ${textContent}`);
+                if (timestamp) {
+                  transcriptSegments.push(`${timestamp}: ${textContent}`);
+                } else {
+                  transcriptSegments.push(textContent);
+                }
               }
             } catch (error) {
               console.log('处理时间戳元素时出错:', error);
@@ -726,6 +826,22 @@ class YouTubeTranscriptionExtractor {
       .replace(/\s+/g, ' ') // 合并空格
       .trim()
       .replace(/^\s*-\s*/, ''); // 移除开头的短横线
+  }
+
+  formatTimestamp(seconds) {
+    if (!seconds) return null;
+    
+    // 如果已经是格式化的时间戳，直接返回
+    if (typeof seconds === 'string' && seconds.includes(':')) {
+      return seconds;
+    }
+    
+    // 转换秒数为 mm:ss 格式
+    const totalSeconds = parseInt(seconds, 10);
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
   sleep(ms) {
