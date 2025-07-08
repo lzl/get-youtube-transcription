@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-这是一个 Chrome 浏览器扩展，用于从 YouTube 视频中一键提取转录文本。扩展使用 Manifest V3 规范，采用纯原生 JavaScript 开发，无外部依赖。
+Get Youtube Transcription (just one click) - 一个 Chrome 浏览器扩展，用于从 YouTube 视频中一键提取转录文本。扩展使用 Manifest V3 规范，采用纯原生 JavaScript 开发，无外部依赖。
 
 ## 开发命令
 
@@ -18,22 +18,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 主要组件
 
-1. **YouTubeTranscriptionExtractor 类** (content.js:50-1090)
+1. **YoutubeTranscriptionExtension 类** (content.js:2-714)
    - 扩展的核心类，管理整个生命周期
    - 处理按钮注入、用户交互和转录提取
-   - 包含页面监听、DOM 操作和数据捕获逻辑
+   - 采用清晰的方法命名和模块化设计
 
 2. **数据流程**
    ```
    页面加载 → 初始化扩展 → 监听页面变化 → 注入按钮 → 用户点击 → 提取转录 → 复制到剪贴板
    ```
 
-3. **关键方法**
+3. **关键方法（重构后）**
+   - `initializeExtension()`: 初始化扩展的主入口
    - `setupDataCapture()`: 设置 DOM 监听和数据捕获机制
-   - `observePageChanges()`: 监听 YouTube SPA 导航
-   - `tryAddButton()`: 智能插入"获取转录"按钮
-   - `extractTranscription()`: 执行转录提取主流程
-   - `quickExtractTranscript()`: 模拟用户操作获取转录
+   - `observePageNavigation()`: 监听页面导航变化
+   - `attemptToAddButton()`: 尝试添加转录按钮
+   - `handleTranscriptButtonClick()`: 处理按钮点击事件
+   - `extractTranscriptFromPage()`: 从页面提取转录的主流程
 
 ### YouTube DOM 结构依赖
 
@@ -54,7 +55,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **DOM 依赖性**：扩展高度依赖 YouTube 的 DOM 结构，YouTube 更新可能导致功能失效，需要及时更新选择器
 
 2. **调试技巧**：
-   - 使用 `window.getTranscript()` 在控制台手动触发转录提取
+   - 使用 `window.getTranscript()` 在控制台手动检查转录面板
    - 查看控制台输出了解详细执行流程
    - 发生错误时会输出调试信息帮助定位问题
 

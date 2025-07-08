@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Transcription Extractor",
+  "name": "Get Youtube Transcription (just one click)",
   "version": "1.0",
   "description": "Extract YouTube video transcriptions with one click",
   "permissions": [

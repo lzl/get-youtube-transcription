@@ -1,6 +1,6 @@
-# YouTube 转录提取器
+# Get Youtube Transcription (just one click)
 
-一个简单实用的 Chrome 扩展，可以一键获取 YouTube 视频的转录文本。
+一个简单实用的 Chrome 扩展，只需一次点击即可获取 YouTube 视频的转录文本。
 
 ## 功能特点
 
@@ -26,7 +26,7 @@
 ## 使用方法
 
 1. 打开任意 YouTube 视频页面
-2. 在视频下方的操作按钮区域找到"获取转录"按钮
+2. 在视频下方的操作按钮区域找到"Transcript"按钮
 3. 点击按钮，扩展会自动获取转录并复制到剪贴板
 4. 粘贴到任何需要的地方使用
 
@@ -36,8 +36,8 @@
 
 扩展使用多种方法获取转录：
 
-1. **API 方法**：直接从 YouTube 的内部 API 获取转录数据
-2. **页面方法**：通过模拟点击转录按钮获取转录内容
+1. **页面方法**：通过模拟点击转录按钮获取转录内容
+2. **智能检测**：自动检测并展开视频描述区域查找转录按钮
 
 ### 语言优先级
 
@@ -81,73 +81,69 @@
 
 ```mermaid
 graph TD
-    A[页面加载] --> B[创建 YouTubeTranscriptionExtractor 实例]
+    A[页面加载] --> B[创建 YoutubeTranscriptionExtension 实例]
     B --> C[constructor 构造函数]
-    C --> D[setupDataCapture 设置数据捕获]
-    C --> E[init 初始化]
+    C --> D[initializeExtension 初始化扩展]
     
-    D --> D1[监听 DOM 变化]
-    D --> D2[定期检查 window 对象]
-    D --> D3[提取脚本数据]
+    D --> D1[setupDataCapture 设置数据捕获]
+    D --> D2[setupGlobalDebugTool 设置全局调试工具]
+    D --> D3[observePageNavigation 监听页面导航]
+    D --> D4[startObservingButtonContainer 开始观察按钮容器]
     
-    E --> E1[setupGlobalDebugMethod 设置调试方法]
-    E --> E2[observePageChanges 监听页面变化]
-    E --> E3[startButtonContainerObserver 开始按钮容器观察]
+    D3 --> F[监听 URL 变化]
+    D3 --> G[监听浏览器历史变化]
+    D3 --> H[监听 YouTube 事件]
     
-    E2 --> F[监听 URL 变化]
-    E2 --> G[监听浏览器历史变化]
-    E2 --> H[监听 YouTube 事件]
-    
-    F --> I[页面变化检测]
+    F --> I[页面导航检测]
     G --> I
     H --> I
-    I --> J[cleanupButton 清理旧按钮]
-    J --> E3
+    I --> J[cleanupPreviousButton 清理之前的按钮]
+    J --> D4
     
-    E3 --> K{是否为视频页面?}
+    D4 --> K{是否为视频页面?}
     K -->|否| L[结束]
-    K -->|是| M[tryAddButton 尝试添加按钮]
+    K -->|是| M[attemptToAddButton 尝试添加按钮]
     
     M --> N{按钮是否已存在?}
     N -->|是| O[结束]
-    N -->|否| P[findButtonContainer 查找按钮容器]
+    N -->|否| P[findSuitableButtonContainer 查找合适的按钮容器]
     
     P --> Q{找到有效容器?}
     Q -->|否| R[等待容器出现]
     R --> P
-    Q -->|是| S[createAndInsertButtonToContainer 创建并插入按钮]
+    Q -->|是| S[createAndInsertButton 创建并插入按钮]
     
     S --> T[创建按钮元素]
     T --> U[添加点击事件监听]
     U --> V[插入到容器]
-    V --> W[monitorButtonPresence 监听按钮状态]
+    V --> W[monitorButtonRemoval 监听按钮移除]
     
     U --> X[用户点击按钮]
-    X --> Y[extractTranscription 提取转录]
-    Y --> Z[updateButtonState 更新按钮状态为 processing]
-    Z --> AA[getTranscription 获取转录]
+    X --> Y[handleTranscriptButtonClick 处理转录按钮点击]
+    Y --> Z[updateButtonState 更新按钮状态为 loading]
+    Z --> AA[extractTranscript 提取转录]
     
-    AA --> BB[quickExtractTranscript 快速提取转录]
-    BB --> CC[expandDescription 展开描述]
-    CC --> DD[findVisibleTranscriptButton 查找转录按钮]
+    AA --> BB[extractTranscriptFromPage 从页面提取转录]
+    BB --> CC[expandVideoDescription 展开视频描述]
+    CC --> DD[findTranscriptButton 查找转录按钮]
     
     DD --> EE{找到转录按钮?}
     EE -->|否| FF[显示错误通知]
     EE -->|是| GG[点击转录按钮]
     
     GG --> HH[等待转录面板加载]
-    HH --> II[extractTranscriptionContent 提取转录内容]
+    HH --> II[extractTranscriptContent 提取转录内容]
     
     II --> JJ[查找转录段落元素]
     JJ --> KK[提取并清理文本]
     KK --> LL[合并转录段落]
     
     LL --> MM{转录获取成功?}
-    MM -->|是| NN[copyToClipboard 复制到剪贴板]
-    MM -->|否| OO[showDebugInfo 显示调试信息]
+    MM -->|是| NN[copyTextToClipboard 复制文本到剪贴板]
+    MM -->|否| OO[showDebugInformation 显示调试信息]
     
-    NN --> PP[showNotification 显示成功通知]
-    OO --> QQ[showNotification 显示错误通知]
+    NN --> PP[showUserNotification 显示用户通知]
+    OO --> QQ[showUserNotification 显示错误通知]
     
     PP --> RR[updateButtonState 恢复按钮状态]
     QQ --> RR
@@ -168,19 +164,19 @@ graph TD
 
 ### 主要组件
 
-1. **YouTubeTranscriptionExtractor 类**
+1. **YoutubeTranscriptionExtension 类**
    - 处理按钮注入和转录获取
-   - 监听页面变化
-   - 管理用户界面
+   - 监听页面导航变化
+   - 管理用户界面交互
 
 2. **核心方法说明**
    - `setupDataCapture()`: 设置数据捕获机制，监听 DOM 变化和脚本注入
-   - `observePageChanges()`: 监听页面变化，支持 SPA 导航
-   - `startButtonContainerObserver()`: 智能检测按钮容器出现时机
-   - `tryAddButton()`: 动态添加转录按钮到合适位置
-   - `extractTranscription()`: 主要的转录提取流程
-   - `quickExtractTranscript()`: 快速转录提取策略
-   - `extractTranscriptionContent()`: 从页面提取转录内容
+   - `observePageNavigation()`: 监听页面导航变化，支持 SPA 单页应用
+   - `startObservingButtonContainer()`: 智能检测按钮容器出现时机
+   - `attemptToAddButton()`: 尝试添加转录按钮到合适位置
+   - `handleTranscriptButtonClick()`: 处理转录按钮点击事件
+   - `extractTranscriptFromPage()`: 从页面提取转录的主要流程
+   - `extractTranscriptContent()`: 从转录面板提取具体内容
 
 3. **用户界面**
    - 自适应按钮设计
@@ -242,6 +238,10 @@ color: var(--yt-spec-text-primary, #0f0f0f);
 - 重新加载扩展
 - 检查 YouTube 主题设置
 
+### 调试工具
+- 在浏览器控制台运行 `window.getTranscript()` 来手动检查转录面板
+- 查看控制台输出了解详细执行流程
+
 ## 更新日志
 
 ### v1.0
@@ -260,4 +260,4 @@ MIT License
 
 ## 联系方式
 
-如有问题或建议，请通过 GitHub Issues 联系。 
+如有问题或建议，请通过 GitHub Issues 联系。
