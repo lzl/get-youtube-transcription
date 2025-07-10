@@ -3,10 +3,6 @@
   "name": "Get Youtube Transcription (just one click)",
   "version": "1.0",
   "description": "Extract YouTube video transcriptions with one click",
-  "permissions": [
-    "activeTab",
-    "scripting"
-  ],
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
