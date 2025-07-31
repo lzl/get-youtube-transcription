@@ -610,12 +610,21 @@ class YoutubeTranscriptionExtension {
 
   // ==================== Utility Section ====================
   async copyTextToClipboard(text) {
+    // Get video title and URL
+    const videoTitle = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim() || 
+                      document.querySelector('h1.title')?.textContent?.trim() || 
+                      'Unknown Title';
+    const videoUrl = window.location.href;
+    
+    // Format output: title, url, empty line, then transcript
+    const formattedText = `${videoTitle}\n${videoUrl}\n\n${text}`;
+    
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(formattedText);
     } catch (error) {
       // Fallback method for older browsers
       const textArea = document.createElement('textarea');
-      textArea.value = text;
+      textArea.value = formattedText;
       textArea.style.position = 'fixed';
       textArea.style.opacity = '0';
       document.body.appendChild(textArea);
