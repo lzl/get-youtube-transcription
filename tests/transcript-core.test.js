@@ -151,3 +151,14 @@ test('buildTimedTextUrl appends json3 format and optional pot token', () => {
     'https://www.youtube.com/api/timedtext?v=abc&fmt=json3&pot=token-1&c=WEB'
   );
 });
+
+test('getVideoIdFromUrl only supports watch pages', () => {
+  assert.equal(
+    core.getVideoIdFromUrl('https://www.youtube.com/watch?v=abc123'),
+    'abc123'
+  );
+  assert.equal(
+    core.getVideoIdFromUrl('https://www.youtube.com/shorts/abc123'),
+    null
+  );
+});
