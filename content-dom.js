@@ -16,12 +16,6 @@
     '#menu-container',
   ];
 
-  const SHORTS_CONTAINER_SELECTORS = [
-    'ytd-reel-player-overlay-renderer #actions',
-    'ytd-reel-player-overlay-renderer #action-buttons',
-    'ytd-shorts #actions',
-  ];
-
   const TRANSCRIPT_PANEL_BUTTON_SELECTORS = [
     'ytd-video-description-transcript-section-renderer #primary-button button',
   ];
@@ -101,14 +95,6 @@
       const element = documentRef.querySelector(selector);
 
       if (element && isValidWatchContainer(element)) {
-        return element;
-      }
-    }
-
-    for (const selector of SHORTS_CONTAINER_SELECTORS) {
-      const element = documentRef.querySelector(selector);
-
-      if (element) {
         return element;
       }
     }

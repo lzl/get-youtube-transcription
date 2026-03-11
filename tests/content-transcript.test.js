@@ -17,12 +17,12 @@ function createWorkflow(overrides = {}) {
   });
 }
 
-test('createTranscriptWorkflow rewrites shorts URLs to watch URLs', () => {
+test('createTranscriptWorkflow keeps the current URL and does not rewrite shorts URLs', () => {
   const workflow = createWorkflow();
 
   assert.equal(
     workflow.getTranscriptSourceUrl('https://www.youtube.com/shorts/abc123'),
-    'https://www.youtube.com/watch?v=video-123'
+    'https://www.youtube.com/shorts/abc123'
   );
   assert.equal(
     workflow.getTranscriptSourceUrl('https://www.youtube.com/watch?v=abc123'),

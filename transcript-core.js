@@ -228,10 +228,6 @@
   function getVideoIdFromUrl(url) {
     const parsedUrl = new URL(url);
 
-    if (parsedUrl.pathname.startsWith('/shorts/')) {
-      return parsedUrl.pathname.split('/shorts/')[1].split('/')[0];
-    }
-
     if (parsedUrl.pathname === '/watch') {
       return parsedUrl.searchParams.get('v');
     }

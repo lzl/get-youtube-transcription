@@ -24,19 +24,7 @@
   }
 
   function getTranscriptSourceUrl(currentUrl, getVideoIdFromUrl) {
-    const parsedUrl = new URL(currentUrl);
-
-    if (!parsedUrl.pathname.startsWith('/shorts/')) {
-      return currentUrl;
-    }
-
-    const videoId = getVideoIdFromUrl(currentUrl);
-
-    if (!videoId) {
-      throw new Error('Could not determine Shorts video ID');
-    }
-
-    return `https://www.youtube.com/watch?v=${videoId}`;
+    return currentUrl;
   }
 
   function createTranscriptWorkflow(overrides = {}) {

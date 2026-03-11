@@ -152,3 +152,18 @@ test('findTranscriptPanelButton does not match localized labels without transcri
 
   assert.equal(dom.findTranscriptPanelButton(documentRef, () => true), null);
 });
+
+test('findSuitableButtonContainer ignores shorts-only action containers', () => {
+  const shortsActions = { isShortsActions: true };
+  const documentRef = {
+    querySelector(selector) {
+      if (selector === 'ytd-shorts #actions') {
+        return shortsActions;
+      }
+
+      return null;
+    },
+  };
+
+  assert.equal(dom.findSuitableButtonContainer(documentRef), null);
+});
