@@ -3,17 +3,18 @@
   "name": "Get Youtube Transcription (just one click)",
   "version": "1.0",
   "description": "Extract YouTube video transcriptions with one click",
+  "host_permissions": ["https://www.youtube.com/*"],
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["content.js"],
+      "js": ["transcript-core.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["styles.css"],
+      "resources": ["styles.css", "transcript-core.js"],
       "matches": ["https://www.youtube.com/*"]
     }
   ],
