@@ -1,0 +1,4 @@
+interface:
+  display_name: "Package Chrome Extension"
+  short_description: "Create a clean Chrome extension zip"
+  default_prompt: "Use $package-chrome-extension to create a Chrome Web Store upload zip for this repo."
