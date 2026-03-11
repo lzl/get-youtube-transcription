@@ -1,119 +1,93 @@
-// Get Youtube Transcription (just one click) - Content Script
 class YoutubeTranscriptionExtension {
+  static readTranscriptEntriesFromSegmentNodes(segmentNodes) {
+    return Array.from(segmentNodes)
+      .map((segmentNode) => {
+        const legacyTimestamp = segmentNode.querySelector('div.segment-timestamp')?.textContent?.trim();
+        const legacyText = segmentNode.querySelector('yt-formatted-string')?.textContent?.trim();
+
+        if (legacyTimestamp && legacyText) {
+          return [legacyTimestamp, legacyText];
+        }
+
+        const modernTimestamp = segmentNode.querySelector('.ytwTranscriptSegmentViewModelTimestamp')
+          ?.textContent?.trim();
+        if (!modernTimestamp) {
+          return null;
+        }
+
+        let modernText = segmentNode.querySelector('span.yt-core-attributed-string[role="text"]')
+          ?.textContent?.trim();
+
+        if (!modernText) {
+          modernText = YoutubeTranscriptionExtension.extractModernTranscriptFallbackText(
+            segmentNode,
+            modernTimestamp
+          );
+        }
+
+        if (!modernText) {
+          return null;
+        }
+
+        return [modernTimestamp, modernText];
+      })
+      .filter((entry) => entry && entry[1]);
+  }
+
+  static extractModernTranscriptFallbackText(segmentNode, timestamp) {
+    let text = (segmentNode.textContent || '').trim();
+    const accessibilityLabel = segmentNode.querySelector('.ytwTranscriptSegmentViewModelTimestampA11yLabel')
+      ?.textContent?.trim();
+
+    if (timestamp && text.startsWith(timestamp)) {
+      text = text.slice(timestamp.length).trim();
+    }
+
+    if (accessibilityLabel && text.startsWith(accessibilityLabel)) {
+      text = text.slice(accessibilityLabel.length).trim();
+    }
+
+    return text;
+  }
+
   constructor() {
     this.transcriptButton = null;
     this.isExtracting = false;
     this.containerObserver = null;
-    this.capturedPlayerData = null;
-    
+    this.buttonCheckInterval = null;
+    this.potTokens = new Map();
+
     this.initializeExtension();
   }
 
   initializeExtension() {
-    this.setupDataCapture();
+    if (!window.TranscriptCore) {
+      console.error('TranscriptCore is not available');
+      return;
+    }
+
     this.setupGlobalDebugTool();
     this.observePageNavigation();
     this.startObservingButtonContainer();
   }
 
-  // ==================== Data Capture Section ====================
-  setupDataCapture() {
-    console.log('Setting up data capture mechanism...');
-    
-    // Monitor DOM for script injection
-    this.observeScriptInjection();
-    
-    // Periodically check window object for YouTube data
-    this.checkWindowForYoutubeData();
-  }
-
-  observeScriptInjection() {
-    const scriptObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          for (const node of mutation.addedNodes) {
-            if (node.nodeName === 'SCRIPT' && node.textContent) {
-              this.extractYoutubeDataFromScript(node.textContent);
-            }
-          }
-        }
-      }
-    });
-    
-    scriptObserver.observe(document.documentElement, {
-      childList: true,
-      subtree: true
-    });
-  }
-
-  checkWindowForYoutubeData() {
-    const checkInterval = setInterval(() => {
-      if (window.ytInitialPlayerResponse && !this.capturedPlayerData) {
-        this.capturedPlayerData = window.ytInitialPlayerResponse;
-        console.log('Captured ytInitialPlayerResponse from window object');
-        clearInterval(checkInterval);
-      }
-    }, 100);
-    
-    // Stop checking after 10 seconds
-    setTimeout(() => clearInterval(checkInterval), 10000);
-  }
-
-  extractYoutubeDataFromScript(scriptContent) {
-    const dataTypes = [
-      { name: 'ytInitialPlayerResponse', patterns: [
-        /window\["ytInitialPlayerResponse"\]\s*=\s*({.+?});/,
-        /ytInitialPlayerResponse\s*=\s*({.+?});/,
-        /var\s+ytInitialPlayerResponse\s*=\s*({.+?});/
-      ]},
-      { name: 'ytInitialData', patterns: [
-        /window\["ytInitialData"\]\s*=\s*({.+?});/,
-        /ytInitialData\s*=\s*({.+?});/,
-        /var\s+ytInitialData\s*=\s*({.+?});/
-      ]}
-    ];
-
-    for (const dataType of dataTypes) {
-      if (scriptContent.includes(dataType.name) && !window[dataType.name]) {
-        for (const pattern of dataType.patterns) {
-          const match = scriptContent.match(pattern);
-          if (match) {
-            try {
-              const data = JSON.parse(match[1]);
-              window[dataType.name] = data;
-              if (dataType.name === 'ytInitialPlayerResponse') {
-                this.capturedPlayerData = data;
-              }
-              console.log(`Successfully extracted ${dataType.name} from script`);
-              break;
-            } catch (e) {
-              console.error(`Failed to parse ${dataType.name}:`, e);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // ==================== Page Navigation Section ====================
   observePageNavigation() {
-    let lastUrl = location.href;
-    
+    let lastUrl = window.location.href;
+
     const handleNavigationChange = () => {
-      const currentUrl = location.href;
-      if (currentUrl !== lastUrl) {
-        lastUrl = currentUrl;
-        console.log('Page navigation detected:', currentUrl);
-        
-        this.cleanupPreviousButton();
-        this.startObservingButtonContainer();
+      const currentUrl = window.location.href;
+      if (currentUrl === lastUrl) {
+        return;
       }
+
+      lastUrl = currentUrl;
+      this.cleanupPreviousButton();
+      this.startObservingButtonContainer();
     };
 
-    // Multiple ways to detect navigation changes
-    new MutationObserver(handleNavigationChange).observe(document, { 
-      subtree: true, 
-      childList: true 
+    new MutationObserver(handleNavigationChange).observe(document, {
+      subtree: true,
+      childList: true,
     });
 
     window.addEventListener('popstate', handleNavigationChange);
@@ -126,164 +100,118 @@ class YoutubeTranscriptionExtension {
       this.containerObserver.disconnect();
       this.containerObserver = null;
     }
+
+    if (this.buttonCheckInterval) {
+      clearInterval(this.buttonCheckInterval);
+      this.buttonCheckInterval = null;
+    }
+
+    if (this.transcriptButton && document.contains(this.transcriptButton)) {
+      this.transcriptButton.remove();
+    }
+
     this.transcriptButton = null;
   }
 
-  // ==================== Button Management Section ====================
   startObservingButtonContainer() {
     if (!this.isYoutubeVideoPage()) {
       return;
     }
 
-    console.log('Starting to observe for button container...');
-    
-    // Try to add button immediately
     this.attemptToAddButton();
-    
-    // Setup observer for container appearance
     this.setupContainerObserver();
-    
-    // Listen to YouTube-specific events
-    this.listenToYoutubeEvents();
+
+    if (this.buttonCheckInterval) {
+      clearInterval(this.buttonCheckInterval);
+    }
+
+    this.buttonCheckInterval = setInterval(() => {
+      if (!this.isYoutubeVideoPage()) {
+        return;
+      }
+
+      if (!this.transcriptButton || !document.contains(this.transcriptButton)) {
+        this.transcriptButton = null;
+        this.attemptToAddButton();
+      }
+    }, 1500);
   }
 
   setupContainerObserver() {
-    this.containerObserver = new MutationObserver((mutations) => {
-      const hasRelevantChanges = mutations.some(mutation => {
-        if (mutation.addedNodes.length > 0) {
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === Node.ELEMENT_NODE && this.isButtonContainerElement(node)) {
-              return true;
-            }
-          }
-        }
-        return false;
-      });
-      
-      if (hasRelevantChanges) {
-        console.log('Detected button container changes, attempting to add button');
-        this.attemptToAddButton();
-      }
+    this.containerObserver = new MutationObserver(() => {
+      this.attemptToAddButton();
     });
 
     const observeTarget = document.querySelector('#primary, #page-manager, ytd-app') || document.body;
     this.containerObserver.observe(observeTarget, {
       childList: true,
       subtree: true,
-      attributeFilter: ['class', 'id']
     });
-  }
-
-  listenToYoutubeEvents() {
-    const youtubeEvents = [
-      'yt-navigate-finish',
-      'yt-page-data-updated', 
-      'yt-player-updated',
-      'yt-action-panel-update',
-      'yt-watch-comments-loaded'
-    ];
-    
-    youtubeEvents.forEach(eventName => {
-      window.addEventListener(eventName, () => {
-        console.log(`Detected YouTube event: ${eventName}`);
-        setTimeout(() => this.attemptToAddButton(), 100);
-      });
-    });
-  }
-
-  isButtonContainerElement(element) {
-    const containerSelectors = [
-      '#actions-inner',
-      '#top-level-buttons-computed', 
-      '#menu-container',
-      '.ytd-menu-renderer',
-      '[class*="actions"]',
-      '[id*="actions"]'
-    ];
-    
-    return containerSelectors.some(selector => {
-      return element.matches?.(selector) || element.querySelector?.(selector);
-    });
-  }
-
-  attemptToAddButton() {
-    // Check if button already exists and is in DOM
-    if (this.transcriptButton && document.contains(this.transcriptButton)) {
-      return;
-    }
-
-    // Clean up invalid button reference
-    if (this.transcriptButton && !document.contains(this.transcriptButton)) {
-      this.transcriptButton = null;
-    }
-
-    if (!this.isYoutubeVideoPage()) {
-      return;
-    }
-
-    const container = this.findSuitableButtonContainer();
-    if (container && this.isValidContainer(container)) {
-      console.log('Found valid container, adding button');
-      this.createAndInsertButton(container);
-    }
   }
 
   isYoutubeVideoPage() {
-    // Regular video page: /watch?v=videoId
-    const isWatchPage = location.pathname === '/watch' && location.search.includes('v=');
-    
-    // Live video page: /live/videoId
-    const isLivePage = location.pathname.startsWith('/live/');
-    
-    return isWatchPage || isLivePage;
+    return Boolean(this.getVideoId());
+  }
+
+  getVideoId(url = window.location.href) {
+    return window.TranscriptCore.getVideoIdFromUrl(url);
   }
 
   findSuitableButtonContainer() {
-    // Priority order for container selectors
-    const containerSelectors = [
+    const watchSelectors = [
       '#actions-inner #top-level-buttons-computed',
       '#top-level-buttons-computed',
       '#actions-inner',
-      '#actions #menu-container',
-      '#menu-container'
+      '#menu-container',
     ];
 
-    // Try direct selectors first
-    for (const selector of containerSelectors) {
+    for (const selector of watchSelectors) {
       const element = document.querySelector(selector);
-      if (element && this.isValidContainer(element)) {
+      if (element && this.isValidWatchContainer(element)) {
         return element;
       }
     }
 
-    // Fallback: find container by existing buttons
-    const existingButtonSelectors = [
-      'button[aria-label*="like" i]',
-      'button[aria-label*="Share" i]', 
-      'button[aria-label*="Save" i]'
+    const shortsSelectors = [
+      'ytd-reel-player-overlay-renderer #actions',
+      'ytd-reel-player-overlay-renderer #action-buttons',
+      'ytd-shorts #actions',
     ];
 
-    for (const buttonSelector of existingButtonSelectors) {
-      const button = document.querySelector(buttonSelector);
-      if (button) {
-        const container = button.closest('#top-level-buttons-computed, #actions-inner, #menu-container');
-        if (container && this.isValidContainer(container)) {
-          return container;
-        }
+    for (const selector of shortsSelectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        return element;
       }
     }
 
     return null;
   }
 
-  isValidContainer(element) {
-    // Container should have other action buttons
-    const hasActionButtons = element.querySelector('button[aria-label*="like" i], button[aria-label*="Share" i], button[aria-label*="Save" i]');
-    
-    // Container should not be in title area
+  isValidWatchContainer(element) {
+    const hasActionButtons = element.querySelector(
+      'button[aria-label*="like" i], button[aria-label*="Share" i], button[aria-label*="Save" i]'
+    );
     const isInTitleArea = element.closest('#title, .title, ytd-video-primary-info-renderer #container');
-    
-    return !!hasActionButtons && !isInTitleArea;
+
+    return Boolean(hasActionButtons) && !isInTitleArea;
+  }
+
+  attemptToAddButton() {
+    if (!this.isYoutubeVideoPage()) {
+      return;
+    }
+
+    if (this.transcriptButton && document.contains(this.transcriptButton)) {
+      return;
+    }
+
+    const container = this.findSuitableButtonContainer();
+    if (!container) {
+      return;
+    }
+
+    this.createAndInsertButton(container);
   }
 
   createAndInsertButton(targetContainer) {
@@ -291,55 +219,24 @@ class YoutubeTranscriptionExtension {
       return;
     }
 
-    // Create button element
-    this.transcriptButton = document.createElement('button');
-    this.transcriptButton.className = 'yt-transcript-extractor-btn';
-    this.transcriptButton.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'yt-transcript-extractor-btn';
+    button.title = 'Get video transcript with one click';
+    button.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"></path>
       </svg>
       <span>Transcript</span>
     `;
-    
-    this.transcriptButton.title = 'Get video transcript with one click';
-    this.transcriptButton.addEventListener('click', () => this.handleTranscriptButtonClick());
-
-    targetContainer.appendChild(this.transcriptButton);
-    console.log('Transcript button successfully inserted');
-    
-    this.monitorButtonRemoval();
-  }
-
-  monitorButtonRemoval() {
-    if (!this.transcriptButton) return;
-    
-    const removalObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.removedNodes.length > 0) {
-          for (const node of mutation.removedNodes) {
-            if (node === this.transcriptButton || node.contains?.(this.transcriptButton)) {
-              console.log('Transcript button was removed, attempting to re-add');
-              this.transcriptButton = null;
-              removalObserver.disconnect();
-              setTimeout(() => this.attemptToAddButton(), 100);
-              return;
-            }
-          }
-        }
-      }
+    button.addEventListener('click', () => {
+      void this.handleTranscriptButtonClick();
     });
 
-    const buttonContainer = this.transcriptButton.closest('#top-level-buttons-computed, #actions-inner, #menu-container') || 
-                           this.transcriptButton.parentElement;
-    if (buttonContainer) {
-      removalObserver.observe(buttonContainer, {
-        childList: true,
-        subtree: true
-      });
-    }
+    targetContainer.appendChild(button);
+    this.transcriptButton = button;
   }
 
-  // ==================== Transcript Extraction Section ====================
   async handleTranscriptButtonClick() {
     if (this.isExtracting) {
       return;
@@ -348,281 +245,277 @@ class YoutubeTranscriptionExtension {
     this.isExtracting = true;
     this.updateButtonState('loading');
 
-    console.log('=== Starting transcript extraction ===');
-    console.log('Video URL:', window.location.href);
-
     try {
-      const transcript = await this.extractTranscript();
-      
-      if (transcript) {
-        console.log('Successfully extracted transcript, length:', transcript.length);
-        await this.copyTextToClipboard(transcript);
-        this.showUserNotification(`Transcript copied to clipboard! (${transcript.length} characters)`, 'success');
-      } else {
-        console.log('Failed to extract transcript');
-        this.showUserNotification('No transcript found. Please ensure the video has captions/transcript available.', 'error');
-        this.showDebugInformation();
-      }
+      const transcriptPackage = await this.extractTranscriptPackage();
+      await this.copyTextToClipboard(transcriptPackage);
+      this.showUserNotification(
+        `Transcript copied to clipboard! (${transcriptPackage.body.length} characters)`,
+        'success'
+      );
     } catch (error) {
-      console.error('Error during transcript extraction:', error);
-      this.showUserNotification('Failed to get transcript: ' + error.message, 'error');
+      console.error('Transcript extraction failed:', error);
+      this.showUserNotification(`Failed to get transcript: ${error.message}`, 'error');
     } finally {
       this.isExtracting = false;
       this.updateButtonState('normal');
-      console.log('=== Transcript extraction completed ===');
     }
   }
 
-  async extractTranscript() {
+  async extractTranscriptPackage() {
+    const sourceUrl = this.getTranscriptSourceUrl();
+    const html = await this.fetchHtml(sourceUrl);
+    const resolvedPageData = window.TranscriptCore.resolvePageData(html);
+
+    let playerResponse = null;
     try {
-      console.log('Starting transcript extraction process...');
-      const transcript = await this.extractTranscriptFromPage();
-      if (transcript) {
-        return transcript;
-      }
+      playerResponse = window.TranscriptCore.extractJsonBlob(html, 'ytInitialPlayerResponse');
     } catch (error) {
-      console.log('Transcript extraction failed:', error);
+      playerResponse = null;
     }
-    
-    return null;
+
+    const videoId = this.getVideoId(sourceUrl);
+    let transcriptEntries = await this.fetchTimedTextTranscript(playerResponse, videoId);
+
+    if (!transcriptEntries.length) {
+      transcriptEntries = await this.fetchTranscriptFromPanel();
+    }
+
+    if (!transcriptEntries.length) {
+      throw new Error('No captions found. This video may not have a transcript available.');
+    }
+
+    return {
+      title: resolvedPageData.title || this.getPageTitle(),
+      url: window.location.href,
+      body: this.formatTranscriptText(transcriptEntries),
+      entries: transcriptEntries,
+    };
   }
 
-  async extractTranscriptFromPage() {
-    console.log('Attempting to extract transcript from page...');
-    
-    // First expand video description where transcript button might be
-    await this.expandVideoDescription();
-    
-    // Find and click transcript button
-    const transcriptButton = await this.findTranscriptButton();
-    
+  getTranscriptSourceUrl() {
+    if (window.location.pathname.startsWith('/shorts/')) {
+      const videoId = this.getVideoId();
+      if (!videoId) {
+        throw new Error('Could not determine Shorts video ID');
+      }
+
+      return `https://www.youtube.com/watch?v=${videoId}`;
+    }
+
+    return window.location.href;
+  }
+
+  async fetchHtml(url) {
+    const response = await fetch(url, {
+      credentials: 'same-origin',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch YouTube page (${response.status})`);
+    }
+
+    return response.text();
+  }
+
+  async fetchTimedTextTranscript(playerResponse, videoId) {
+    const baseUrl = window.TranscriptCore.getCaptionBaseUrl(playerResponse);
+    if (!baseUrl) {
+      return [];
+    }
+
+    const potToken = await this.capturePotToken(videoId);
+    const timedTextUrl = window.TranscriptCore.buildTimedTextUrl(baseUrl, potToken);
+
+    if (!timedTextUrl) {
+      return [];
+    }
+
+    try {
+      const response = await fetch(timedTextUrl, {
+        credentials: 'same-origin',
+      });
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const payload = await response.json();
+      return window.TranscriptCore.normalizeTranscriptSegments(payload.events);
+    } catch (error) {
+      console.warn('Timedtext transcript fetch failed:', error);
+      return [];
+    }
+  }
+
+  async capturePotToken(videoId) {
+    const cacheKey = `yt-caption-potoken-${videoId || ''}`;
+    if (this.potTokens.has(cacheKey)) {
+      return this.potTokens.get(cacheKey);
+    }
+
+    const subtitlesButton = document.querySelector(
+      '#movie_player button.ytp-subtitles-button, #movie_player .ytp-right-controls-left button.ytp-subtitles-button'
+    );
+
+    if (!subtitlesButton) {
+      return '';
+    }
+
+    try {
+      performance.clearResourceTimings();
+
+      const tokenPromise = new Promise((resolve) => {
+        subtitlesButton.addEventListener(
+          'click',
+          async () => {
+            for (let index = 0; index <= 500; index += 50) {
+              await this.waitForMilliseconds(50);
+
+              const entries = performance.getEntriesByType('resource');
+              const timedTextEntry = entries
+                .filter((entry) => entry.name.includes('/api/timedtext?'))
+                .pop();
+
+              if (!timedTextEntry) {
+                continue;
+              }
+
+              const token = new URL(timedTextEntry.name).searchParams.get('pot');
+              if (token) {
+                this.potTokens.set(cacheKey, token);
+                resolve(token);
+                return;
+              }
+            }
+
+            resolve('');
+          },
+          { once: true }
+        );
+      });
+
+      subtitlesButton.click();
+      subtitlesButton.click();
+
+      const token = await Promise.race([
+        tokenPromise,
+        this.waitForMilliseconds(600).then(() => ''),
+      ]);
+
+      if (token) {
+        this.potTokens.set(cacheKey, token);
+      }
+
+      return token || '';
+    } catch (error) {
+      console.warn('POT token capture failed:', error);
+      return '';
+    }
+  }
+
+  async fetchTranscriptFromPanel() {
+    const transcriptButton = await this.findTranscriptPanelButton();
     if (!transcriptButton) {
-      console.log('No visible transcript button found');
-      return null;
+      return [];
     }
-    
-    console.log('Found transcript button, clicking...');
+
     transcriptButton.click();
-    
-    // Wait for transcript panel to load
-    await this.waitForMilliseconds(2000);
-    
-    // Extract transcript content
-    return await this.extractTranscriptContent();
+
+    const hasSegments = await this.waitForSelector(
+      [
+        '#segments-container > ytd-transcript-segment-renderer',
+        'ytd-engagement-panel-section-list-renderer[target-id="PAmodern_transcript_view"] transcript-segment-view-model',
+      ].join(', '),
+      3000
+    );
+    if (!hasSegments) {
+      return [];
+    }
+
+    await this.waitForMilliseconds(300);
+
+    const segmentNodes = document.querySelectorAll(
+      [
+        'ytd-engagement-panel-section-list-renderer[target-id="PAmodern_transcript_view"] transcript-segment-view-model',
+        '#segments-container > ytd-transcript-segment-renderer',
+      ].join(', ')
+    );
+
+    return YoutubeTranscriptionExtension.readTranscriptEntriesFromSegmentNodes(segmentNodes);
   }
 
-  async expandVideoDescription() {
-    console.log('Expanding video description...');
-    
-    const expandButtonSelectors = [
-      'tp-yt-paper-button#expand',
-      'tp-yt-paper-button.ytd-video-secondary-info-renderer',
-      '#description tp-yt-paper-button',
-      '[id="more"]:not([hidden])',
-      'ytd-text-inline-expander #expand'
+  async findTranscriptPanelButton() {
+    await this.expandVideoDescription();
+
+    const selectors = [
+      'button[aria-label="Show transcript"]',
+      '#button[aria-label="Show transcript"]',
+      'ytd-video-description-transcript-section-renderer #primary-button button',
+      '#primary-button > ytd-button-renderer > yt-button-shape > button',
     ];
-    
-    for (const selector of expandButtonSelectors) {
+
+    for (const selector of selectors) {
       const button = document.querySelector(selector);
       if (button && this.isElementVisible(button)) {
-        console.log(`Clicking expand button: ${selector}`);
-        button.click();
-        await this.waitForMilliseconds(500);
-        break;
-      }
-    }
-  }
-
-  async findTranscriptButton() {
-    console.log('Searching for transcript button...');
-    
-    const searchStrategies = [
-      // Look in description area
-      () => {
-        const buttons = document.querySelectorAll('#description button, #description-inner button');
-        return Array.from(buttons).find(btn => 
-          this.isTranscriptButton(btn) && this.isElementVisible(btn)
-        );
-      },
-      
-      // Look in video info area
-      () => {
-        const buttons = document.querySelectorAll('ytd-video-primary-info-renderer button');
-        return Array.from(buttons).find(btn => 
-          this.isTranscriptButton(btn) && this.isElementVisible(btn)
-        );
-      },
-      
-      // Global search
-      () => {
-        const buttons = document.querySelectorAll('button:not([aria-label*="Close"]):not([aria-label*="关闭"])');
-        return Array.from(buttons).find(btn => 
-          this.isTranscriptButton(btn) && this.isElementVisible(btn)
-        );
-      }
-    ];
-    
-    for (const strategy of searchStrategies) {
-      const button = strategy();
-      if (button) {
-        console.log('Found transcript button');
         return button;
       }
     }
-    
-    return null;
+
+    const fallbackButtons = document.querySelectorAll('button');
+    return Array.from(fallbackButtons).find((button) => {
+      const text = (button.textContent || '').toLowerCase();
+      const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
+
+      return (
+        this.isElementVisible(button) &&
+        ['transcript', 'show transcript', '转录', '字幕'].some((keyword) => {
+          return text.includes(keyword) || ariaLabel.includes(keyword);
+        })
+      );
+    }) || null;
   }
 
-  isTranscriptButton(button) {
-    const text = (button.textContent || '').toLowerCase();
-    const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
-    
-    const transcriptKeywords = ['transcript', '转录', '字幕'];
-    
-    return transcriptKeywords.some(keyword => 
-      text.includes(keyword) || ariaLabel.includes(keyword)
+  async expandVideoDescription() {
+    const selectors = [
+      'tp-yt-paper-button#expand',
+      '#description tp-yt-paper-button',
+      '[id="more"]:not([hidden])',
+      'ytd-text-inline-expander #expand',
+    ];
+
+    for (const selector of selectors) {
+      const button = document.querySelector(selector);
+      if (button && this.isElementVisible(button)) {
+        button.click();
+        await this.waitForMilliseconds(300);
+        return;
+      }
+    }
+  }
+
+  formatTranscriptText(entries) {
+    return entries
+      .map(([timestamp, text]) => {
+        return timestamp ? `${timestamp}: ${text}` : text;
+      })
+      .join('\n');
+  }
+
+  getPageTitle() {
+    return (
+      document.querySelector('h1.ytd-watch-metadata yt-formatted-string')?.textContent?.trim() ||
+      document.querySelector('#title h1 yt-formatted-string')?.textContent?.trim() ||
+      document.querySelector('h1.title')?.textContent?.trim() ||
+      'Unknown Title'
     );
   }
 
-  isElementVisible(element) {
-    if (!element) return false;
-    
-    const style = window.getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden') return false;
-    if (element.offsetWidth === 0 || element.offsetHeight === 0) return false;
-    
-    const rect = element.getBoundingClientRect();
-    const inViewport = rect.top >= 0 && 
-                       rect.left >= 0 && 
-                       rect.bottom <= window.innerHeight && 
-                       rect.right <= window.innerWidth;
-    
-    // Element might be below viewport but still accessible
-    return element.offsetParent !== null && (inViewport || rect.top > 0);
-  }
+  async copyTextToClipboard(transcriptPackage) {
+    const formattedText = `${transcriptPackage.title}\n${transcriptPackage.url}\n\n${transcriptPackage.body}`;
 
-  async extractTranscriptContent() {
-    console.log('Extracting transcript content...');
-    
-    await this.waitForMilliseconds(1000);
-    
-    // Find all transcript segment elements
-    const segmentElements = document.querySelectorAll('ytd-transcript-segment-renderer');
-    console.log(`Found ${segmentElements.length} transcript segments`);
-    
-    if (segmentElements.length > 0) {
-      const transcriptLines = [];
-      
-      for (const segment of segmentElements) {
-        const segmentData = this.extractSegmentData(segment);
-        if (segmentData.text) {
-          const line = segmentData.timestamp 
-            ? `${segmentData.timestamp}: ${segmentData.text}`
-            : segmentData.text;
-          transcriptLines.push(line);
-        }
-      }
-      
-      if (transcriptLines.length > 0) {
-        console.log(`Successfully extracted ${transcriptLines.length} transcript lines`);
-        return transcriptLines.join('\n');
-      }
-    }
-    
-    console.log('Failed to extract transcript content');
-    return null;
-  }
-
-  extractSegmentData(segment) {
-    let text = '';
-    let timestamp = null;
-    
-    // Extract timestamp first
-    const timestampElement = segment.querySelector('[data-start-time], .segment-timestamp, [role="button"]');
-    if (timestampElement) {
-      // Try to get timestamp from data attribute first
-      const dataStartTime = timestampElement.getAttribute('data-start-time');
-      if (dataStartTime) {
-        timestamp = this.formatTimestamp(dataStartTime.trim());
-      } else {
-        // If no data attribute, extract from text content
-        // The timestamp is usually at the beginning of the text
-        const fullText = timestampElement.textContent || '';
-        const timestampMatch = fullText.match(/^\s*(\d+:\d+(?::\d+)?)\s*/);
-        if (timestampMatch) {
-          timestamp = timestampMatch[1];
-        }
-      }
-    }
-    
-    // Extract text content
-    const textSelectors = ['.segment-text', 'span:not([class*="timestamp"])'];
-    for (const selector of textSelectors) {
-      const element = segment.querySelector(selector);
-      if (element) {
-        text = element.textContent || '';
-        break;
-      }
-    }
-    
-    // Fallback: get text from entire segment
-    if (!text) {
-      text = segment.textContent || '';
-      // Remove timestamp from the beginning if present
-      if (timestamp) {
-        text = text.replace(new RegExp(`^\\s*${timestamp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`), '');
-      }
-    }
-    
-    // Clean up text
-    text = this.cleanTranscriptText(text);
-    
-    return { text, timestamp };
-  }
-
-  cleanTranscriptText(text) {
-    if (!text) return '';
-    
-    return text
-      .replace(/\s+/g, ' ')
-      .trim()
-      .replace(/^\s*-\s*/, '');
-  }
-
-  formatTimestamp(timeValue) {
-    if (!timeValue) return null;
-    
-    // Already formatted
-    if (typeof timeValue === 'string' && timeValue.includes(':')) {
-      return timeValue.trim();
-    }
-    
-    // Convert seconds to mm:ss format
-    const totalSeconds = parseInt(timeValue, 10);
-    if (!isNaN(totalSeconds)) {
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-    
-    return null;
-  }
-
-  // ==================== Utility Section ====================
-  async copyTextToClipboard(text) {
-    // Get video title and URL
-    const videoTitle = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim() || 
-                      document.querySelector('h1.title')?.textContent?.trim() || 
-                      'Unknown Title';
-    const videoUrl = window.location.href;
-    
-    // Format output: title, url, empty line, then transcript
-    const formattedText = `${videoTitle}\n${videoUrl}\n\n${text}`;
-    
     try {
       await navigator.clipboard.writeText(formattedText);
     } catch (error) {
-      // Fallback method for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = formattedText;
       textArea.style.position = 'fixed';
@@ -635,29 +528,33 @@ class YoutubeTranscriptionExtension {
   }
 
   updateButtonState(state) {
-    if (!this.transcriptButton) return;
-
-    const span = this.transcriptButton.querySelector('span');
-    if (state === 'loading') {
-      span.textContent = 'Loading...';
-      this.transcriptButton.disabled = true;
-    } else {
-      span.textContent = 'Transcript';
-      this.transcriptButton.disabled = false;
+    if (!this.transcriptButton) {
+      return;
     }
+
+    const label = this.transcriptButton.querySelector('span');
+    if (!label) {
+      return;
+    }
+
+    if (state === 'loading') {
+      label.textContent = 'Loading...';
+      this.transcriptButton.disabled = true;
+      return;
+    }
+
+    label.textContent = 'Transcript';
+    this.transcriptButton.disabled = false;
   }
 
   showUserNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `yt-transcript-notification yt-transcript-notification-${type}`;
     notification.textContent = message;
-
     document.body.appendChild(notification);
 
-    // Show animation
     setTimeout(() => notification.classList.add('show'), 100);
 
-    // Auto hide
     setTimeout(() => {
       notification.classList.remove('show');
       setTimeout(() => {
@@ -668,76 +565,112 @@ class YoutubeTranscriptionExtension {
     }, 3000);
   }
 
-  waitForMilliseconds(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  waitForMilliseconds(milliseconds) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, milliseconds);
+    });
   }
 
-  // ==================== Debug Section ====================
-  setupGlobalDebugTool() {
-    window.getTranscript = () => {
-      console.log('=== YouTube Transcript Debug Tool ===');
-      
-      const transcriptPanel = document.querySelector('ytd-transcript-renderer');
-      if (transcriptPanel) {
-        console.log('Found transcript panel:', transcriptPanel);
-        
-        const segments = transcriptPanel.querySelectorAll('ytd-transcript-segment-renderer');
-        console.log('Transcript segments:', segments.length);
-        
-        if (segments.length > 0) {
-          console.log('First 5 segments:');
-          Array.from(segments).slice(0, 5).forEach((segment, index) => {
-            console.log(`Segment ${index + 1}:`, segment.textContent?.trim());
-          });
-        }
-      } else {
-        console.log('No transcript panel found');
+  waitForSelector(selector, timeout = 3000) {
+    return new Promise((resolve) => {
+      if (document.querySelector(selector)) {
+        resolve(true);
+        return;
       }
-      
-      console.log('Caption data:', window.ytInitialPlayerResponse?.captions);
-      
+
+      const observer = new MutationObserver(() => {
+        if (document.querySelector(selector)) {
+          observer.disconnect();
+          resolve(true);
+        }
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(false);
+      }, timeout);
+    });
+  }
+
+  timestampToMilliseconds(timestamp) {
+    const parts = timestamp.split(':').map((part) => Number(part));
+
+    if (parts.length === 2) {
+      return ((parts[0] * 60) + parts[1]) * 1000;
+    }
+
+    if (parts.length === 3) {
+      return ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
+    }
+
+    return 0;
+  }
+
+  isElementVisible(element) {
+    if (!element) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return false;
+    }
+
+    if (element.offsetWidth === 0 || element.offsetHeight === 0) {
+      return false;
+    }
+
+    return element.offsetParent !== null;
+  }
+
+  setupGlobalDebugTool() {
+    window.getTranscript = async () => {
+      return this.extractTranscriptPackage();
+    };
+
+    window.getTranscriptDebug = async () => {
+      const sourceUrl = this.getTranscriptSourceUrl();
+      const html = await this.fetchHtml(sourceUrl);
+
+      let pageData = null;
+      let playerResponse = null;
+
+      try {
+        pageData = window.TranscriptCore.resolvePageData(html);
+      } catch (error) {
+        pageData = { error: error.message };
+      }
+
+      try {
+        playerResponse = window.TranscriptCore.extractJsonBlob(html, 'ytInitialPlayerResponse');
+      } catch (error) {
+        playerResponse = null;
+      }
+
       return {
-        transcriptPanel,
-        captionData: window.ytInitialPlayerResponse?.captions
+        sourceUrl,
+        pageData,
+        captionBaseUrl: window.TranscriptCore.getCaptionBaseUrl(playerResponse),
       };
     };
   }
-
-  showDebugInformation() {
-    console.log('=== Debug Information ===');
-    
-    // Check YouTube data
-    console.log('--- YouTube Data Check ---');
-    console.log('ytInitialPlayerResponse exists:', !!window.ytInitialPlayerResponse);
-    console.log('ytInitialData exists:', !!window.ytInitialData);
-    
-    if (window.ytInitialPlayerResponse?.captions) {
-      const tracks = window.ytInitialPlayerResponse.captions.playerCaptionsTracklistRenderer?.captionTracks;
-      console.log('Caption tracks:', tracks?.length || 0);
-      tracks?.forEach((track, i) => {
-        console.log(`  Track ${i + 1}: ${track.languageCode} - ${track.name?.simpleText || 'Unnamed'}`);
-      });
-    }
-    
-    // Check transcript buttons
-    console.log('\n--- Transcript Button Check ---');
-    const transcriptButtons = document.querySelectorAll('[aria-label*="Transcript"], [aria-label*="转录"], [aria-label*="transcript"]');
-    console.log('Found transcript buttons:', transcriptButtons.length);
-    
-    // Check transcript panel
-    console.log('\n--- Transcript Panel Check ---');
-    const transcriptSegments = document.querySelectorAll('ytd-transcript-segment-renderer');
-    console.log('Transcript segments found:', transcriptSegments.length);
-    
-    console.log('\nFor more details, run window.getTranscript() in the console');
-  }
 }
 
-// Initialize extension
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { YoutubeTranscriptionExtension };
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      new YoutubeTranscriptionExtension();
+    });
+  } else {
     new YoutubeTranscriptionExtension();
-  });
-} else {
-  new YoutubeTranscriptionExtension();
+  }
 }
