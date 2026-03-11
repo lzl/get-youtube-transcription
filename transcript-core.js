@@ -9,14 +9,20 @@
     root.TranscriptCore = api;
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  function readBalancedObject(source, startIndex) {
+  const TITLE_READERS = [
+    (data) => data?.videoDetails?.title,
+    (data) => data?.playerOverlays?.playerOverlayRenderer?.videoDetails?.playerOverlayVideoDetailsRenderer?.title?.simpleText,
+    (data) => data?.microformat?.playerMicroformatRenderer?.title?.simpleText,
+  ];
+
+  function readBalancedObject(source, objectStart) {
     let depth = 0;
     let inString = false;
     let stringQuote = '';
     let escaped = false;
 
-    for (let index = startIndex; index < source.length; index += 1) {
-      const char = source[index];
+    for (let index = objectStart; index < source.length; index += 1) {
+      const character = source[index];
 
       if (escaped) {
         escaped = false;
@@ -24,26 +30,28 @@
       }
 
       if (inString) {
-        if (char === '\\') {
+        if (character === '\\') {
           escaped = true;
-        } else if (char === stringQuote) {
+        } else if (character === stringQuote) {
           inString = false;
         }
+
         continue;
       }
 
-      if (char === '"' || char === "'") {
+      if (character === '"' || character === "'") {
         inString = true;
-        stringQuote = char;
+        stringQuote = character;
         continue;
       }
 
-      if (char === '{') {
+      if (character === '{') {
         depth += 1;
-      } else if (char === '}') {
+      } else if (character === '}') {
         depth -= 1;
+
         if (depth === 0) {
-          return source.slice(startIndex, index + 1);
+          return source.slice(objectStart, index + 1);
         }
       }
     }
@@ -63,21 +71,21 @@
       new RegExp(`(?:^|[;\\s])${escapedKey}\\s*=\\s*\\{`, 'g'),
     ];
 
-    let earliestObjectStart = -1;
-
-    for (const pattern of patterns) {
+    return patterns.reduce((earliestObjectStart, pattern) => {
       const match = pattern.exec(source);
+
       if (!match) {
-        continue;
+        return earliestObjectStart;
       }
 
       const objectStart = match.index + match[0].lastIndexOf('{');
-      if (earliestObjectStart === -1 || objectStart < earliestObjectStart) {
-        earliestObjectStart = objectStart;
-      }
-    }
 
-    return earliestObjectStart;
+      if (earliestObjectStart === -1 || objectStart < earliestObjectStart) {
+        return objectStart;
+      }
+
+      return earliestObjectStart;
+    }, -1);
   }
 
   function extractJsonBlob(source, key) {
@@ -97,40 +105,37 @@
   }
 
   function getTitleFromData(data) {
-    return (
-      data?.videoDetails?.title ||
-      data?.playerOverlays?.playerOverlayRenderer?.videoDetails?.playerOverlayVideoDetailsRenderer?.title?.simpleText ||
-      data?.microformat?.playerMicroformatRenderer?.title?.simpleText ||
-      'Untitled Video'
-    );
+    for (const readTitle of TITLE_READERS) {
+      const title = readTitle(data);
+
+      if (title) {
+        return title;
+      }
+    }
+
+    return 'Untitled Video';
   }
 
   function resolvePageData(html) {
-    let initialData = null;
-
     try {
-      initialData = extractJsonBlob(html, 'ytInitialData');
-    } catch (error) {
-      initialData = null;
-    }
+      const initialData = extractJsonBlob(html, 'ytInitialData');
 
-    if (initialData) {
       return {
         resolvedType: 'regular',
         sourceKey: 'ytInitialData',
         data: initialData,
         title: getTitleFromData(initialData),
       };
+    } catch (error) {
+      const playerResponse = extractJsonBlob(html, 'ytInitialPlayerResponse');
+
+      return {
+        resolvedType: 'shorts',
+        sourceKey: 'ytInitialPlayerResponse',
+        data: playerResponse,
+        title: getTitleFromData(playerResponse),
+      };
     }
-
-    const playerResponse = extractJsonBlob(html, 'ytInitialPlayerResponse');
-
-    return {
-      resolvedType: 'shorts',
-      sourceKey: 'ytInitialPlayerResponse',
-      data: playerResponse,
-      title: getTitleFromData(playerResponse),
-    };
   }
 
   function getCaptionBaseUrl(playerResponse) {
@@ -144,14 +149,48 @@
     const seconds = totalSeconds % 60;
 
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
 
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
   }
 
   function normalizeText(text) {
     return (text || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function readPanelTranscriptSegment(segment) {
+    const renderer = segment?.transcriptSegmentRenderer;
+
+    if (!renderer) {
+      return null;
+    }
+
+    return [
+      renderer.startTimeText?.simpleText || '',
+      normalizeText((renderer.snippet?.runs || []).map((run) => run.text || '').join('')),
+    ];
+  }
+
+  function readModernTranscriptSegment(segment) {
+    const renderer = segment?.transcriptSegmentViewModel;
+
+    if (!renderer) {
+      return null;
+    }
+
+    return [renderer.timestamp || '', normalizeText(renderer.simpleText)];
+  }
+
+  function readJson3TranscriptSegment(segment) {
+    if (!segment?.segs) {
+      return null;
+    }
+
+    return [
+      formatMillisecondsAsTimestamp(segment.tStartMs || 0),
+      normalizeText(segment.segs.map((part) => part.utf8 || '').join('')),
+    ];
   }
 
   function normalizeTranscriptSegments(segments) {
@@ -161,28 +200,11 @@
 
     return segments
       .map((segment) => {
-        if (segment?.transcriptSegmentRenderer) {
-          const renderer = segment.transcriptSegmentRenderer;
-          const text = normalizeText(
-            (renderer.snippet?.runs || []).map((run) => run.text || '').join('')
-          );
-
-          return [renderer.startTimeText?.simpleText || '', text];
-        }
-
-        if (segment?.transcriptSegmentViewModel) {
-          const renderer = segment.transcriptSegmentViewModel;
-          return [renderer.timestamp || '', normalizeText(renderer.simpleText)];
-        }
-
-        if (segment?.segs) {
-          return [
-            formatMillisecondsAsTimestamp(segment.tStartMs || 0),
-            normalizeText(segment.segs.map((part) => part.utf8 || '').join('')),
-          ];
-        }
-
-        return null;
+        return (
+          readPanelTranscriptSegment(segment) ||
+          readModernTranscriptSegment(segment) ||
+          readJson3TranscriptSegment(segment)
+        );
       })
       .filter((entry) => entry && entry[1]);
   }
@@ -204,14 +226,14 @@
   }
 
   function getVideoIdFromUrl(url) {
-    const parsed = new URL(url);
+    const parsedUrl = new URL(url);
 
-    if (parsed.pathname.startsWith('/shorts/')) {
-      return parsed.pathname.split('/shorts/')[1].split('/')[0];
+    if (parsedUrl.pathname.startsWith('/shorts/')) {
+      return parsedUrl.pathname.split('/shorts/')[1].split('/')[0];
     }
 
-    if (parsed.pathname === '/watch') {
-      return parsed.searchParams.get('v');
+    if (parsedUrl.pathname === '/watch') {
+      return parsedUrl.searchParams.get('v');
     }
 
     return null;
