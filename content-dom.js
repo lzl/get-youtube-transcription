@@ -23,10 +23,7 @@
   ];
 
   const TRANSCRIPT_PANEL_BUTTON_SELECTORS = [
-    'button[aria-label="Show transcript"]',
-    '#button[aria-label="Show transcript"]',
     'ytd-video-description-transcript-section-renderer #primary-button button',
-    '#primary-button > ytd-button-renderer > yt-button-shape > button',
   ];
 
   const DESCRIPTION_EXPAND_SELECTORS = [
@@ -226,17 +223,7 @@
       }
     }
 
-    return Array.from(documentRef.querySelectorAll('button')).find((button) => {
-      const text = (button.textContent || '').toLowerCase();
-      const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
-
-      return (
-        isVisible(button) &&
-        ['transcript', 'show transcript', '转录', '字幕'].some((keyword) => {
-          return text.includes(keyword) || ariaLabel.includes(keyword);
-        })
-      );
-    }) || null;
+    return null;
   }
 
   async function expandVideoDescription(documentRef, isVisible, wait) {

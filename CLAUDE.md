@@ -40,7 +40,7 @@ Get Youtube Transcription (just one click) - 一个 Chrome 浏览器扩展，用
 
 扩展依赖以下 YouTube 元素选择器：
 - 按钮容器: `#top-level-buttons-computed`, `#actions-inner`
-- 转录按钮: `button[aria-label*="转录"]`, `button[aria-label*="Transcript"]`
+- 转录按钮: `ytd-video-description-transcript-section-renderer #primary-button button`
 - 转录内容: `ytd-transcript-segment-renderer`
 - 描述区域: `#expand`, `tp-yt-paper-button#expand`
 

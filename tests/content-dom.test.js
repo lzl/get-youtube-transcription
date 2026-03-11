@@ -40,6 +40,19 @@ function createModernSegment(timestamp, text, options = {}) {
   };
 }
 
+function createButton(options = {}) {
+  return {
+    textContent: options.textContent || '',
+    getAttribute(name) {
+      if (name === 'aria-label') {
+        return options.ariaLabel || '';
+      }
+
+      return '';
+    },
+  };
+}
+
 test('content-dom reads legacy and modern transcript rows', () => {
   assert.deepEqual(dom.readTranscriptEntriesFromSegmentNodes([
     createLegacySegment('0:03', 'legacy transcript'),
@@ -81,4 +94,61 @@ test('content-dom creates the unchanged transcript button markup', () => {
   assert.equal(button.className, 'yt-transcript-extractor-btn');
   assert.equal(button.title, 'Get video transcript with one click');
   assert.match(button.innerHTML, /<span>Transcript<\/span>/);
+});
+
+test('findTranscriptPanelButton returns the visible transcript section button', () => {
+  const transcriptButton = createButton();
+  const documentRef = {
+    querySelector(selector) {
+      if (selector === 'ytd-video-description-transcript-section-renderer #primary-button button') {
+        return transcriptButton;
+      }
+
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+
+  assert.equal(dom.findTranscriptPanelButton(documentRef, () => true), transcriptButton);
+});
+
+test('findTranscriptPanelButton ignores generic primary buttons outside transcript containers', () => {
+  const unrelatedPrimaryButton = createButton();
+  const documentRef = {
+    querySelector(selector) {
+      if (selector === '#primary-button > ytd-button-renderer > yt-button-shape > button') {
+        return unrelatedPrimaryButton;
+      }
+
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  };
+
+  assert.equal(dom.findTranscriptPanelButton(documentRef, () => true), null);
+});
+
+test('findTranscriptPanelButton does not match localized labels without transcript structure', () => {
+  const localizedButton = createButton({
+    textContent: '显示字幕',
+    ariaLabel: '显示字幕',
+  });
+  const documentRef = {
+    querySelector() {
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === 'button') {
+        return [localizedButton];
+      }
+
+      return [];
+    },
+  };
+
+  assert.equal(dom.findTranscriptPanelButton(documentRef, () => true), null);
 });
