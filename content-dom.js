@@ -32,12 +32,62 @@
     '#segments-container > ytd-transcript-segment-renderer',
   ].join(', ');
 
+  const DEFAULT_BUTTON_TITLE = 'Get video transcript with one click';
+  const TRANSCRIPT_ICON_PATH = 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z';
+  const SUCCESS_ICON_PATH = 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
+  const NO_TRANSCRIPT_ICON_PATH = 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9.59L5 11.41 6.41 10 17 20.59V5H5v6.59L3.41 10 3 9.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v10.59L19.59 14H19V5zm-6.59 9L14 13.59 12.59 15H7v-2h5.41z';
+  const ERROR_ICON_PATH = 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z';
+
   const TRANSCRIPT_BUTTON_MARKUP = `
       <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"></path>
+        <path d="${TRANSCRIPT_ICON_PATH}"></path>
       </svg>
-      <span>Transcript</span>
+      <span class="yt-transcript-button-label">Transcript</span>
+      <span class="yt-transcript-button-status" aria-live="polite" aria-atomic="true"></span>
     `;
+
+  const BUTTON_STATES = {
+    normal: {
+      label: 'Transcript',
+      status: '',
+      title: DEFAULT_BUTTON_TITLE,
+      ariaLabel: DEFAULT_BUTTON_TITLE,
+      iconPath: TRANSCRIPT_ICON_PATH,
+      disabled: false,
+    },
+    loading: {
+      label: 'Getting transcript...',
+      status: 'Getting transcript...',
+      title: 'Getting transcript...',
+      ariaLabel: 'Getting transcript...',
+      iconPath: TRANSCRIPT_ICON_PATH,
+      disabled: true,
+    },
+    success: {
+      label: 'Copied transcript',
+      status: 'Transcript copied to clipboard',
+      title: 'Transcript copied to clipboard',
+      ariaLabel: 'Transcript copied to clipboard',
+      iconPath: SUCCESS_ICON_PATH,
+      disabled: false,
+    },
+    no_transcript: {
+      label: 'No transcript',
+      status: 'No transcript available',
+      title: 'No transcript available',
+      ariaLabel: 'No transcript available',
+      iconPath: NO_TRANSCRIPT_ICON_PATH,
+      disabled: false,
+    },
+    error: {
+      label: 'Failed',
+      status: 'Failed to get transcript',
+      title: 'Failed to get transcript',
+      ariaLabel: 'Failed to get transcript',
+      iconPath: ERROR_ICON_PATH,
+      disabled: false,
+    },
+  };
 
   function extractModernTranscriptFallbackText(segmentNode, timestamp) {
     let text = (segmentNode.textContent || '').trim();
@@ -106,7 +156,9 @@
     const button = documentRef.createElement('button');
     button.type = 'button';
     button.className = 'yt-transcript-extractor-btn';
-    button.title = 'Get video transcript with one click';
+    button.title = DEFAULT_BUTTON_TITLE;
+    button.setAttribute('aria-label', DEFAULT_BUTTON_TITLE);
+    button.dataset.state = 'normal';
     button.innerHTML = TRANSCRIPT_BUTTON_MARKUP;
     button.addEventListener('click', onClick);
     return button;
@@ -117,37 +169,29 @@
       return;
     }
 
-    const label = button.querySelector('span');
+    const label = button.querySelector('.yt-transcript-button-label') || button.querySelector('span');
+    const status = button.querySelector('.yt-transcript-button-status');
+    const iconPath = button.querySelector('svg path');
+    const resolvedState = BUTTON_STATES[state] ? state : 'normal';
+    const nextState = BUTTON_STATES[resolvedState];
 
     if (!label) {
       return;
     }
 
-    if (state === 'loading') {
-      label.textContent = 'Loading...';
-      button.disabled = true;
-      return;
+    label.textContent = nextState.label;
+    button.disabled = nextState.disabled;
+    button.dataset.state = resolvedState;
+    button.title = nextState.title;
+    button.setAttribute('aria-label', nextState.ariaLabel);
+
+    if (status) {
+      status.textContent = nextState.status;
     }
 
-    label.textContent = 'Transcript';
-    button.disabled = false;
-  }
-
-  function showUserNotification(documentRef, message, type = 'info') {
-    const notification = documentRef.createElement('div');
-    notification.className = `yt-transcript-notification yt-transcript-notification-${type}`;
-    notification.textContent = message;
-    documentRef.body.appendChild(notification);
-
-    setTimeout(() => notification.classList.add('show'), 100);
-    setTimeout(() => {
-      notification.classList.remove('show');
-      setTimeout(() => {
-        if (documentRef.body.contains(notification)) {
-          documentRef.body.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
+    if (iconPath) {
+      iconPath.setAttribute('d', nextState.iconPath);
+    }
   }
 
   function waitForMilliseconds(milliseconds) {
@@ -244,7 +288,6 @@
     isElementVisible,
     isValidWatchContainer,
     readTranscriptEntriesFromSegmentNodes,
-    showUserNotification,
     updateButtonState,
     waitForMilliseconds,
     waitForSelector,

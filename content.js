@@ -34,6 +34,10 @@ function getTranscriptWorkflowApi() {
   return null;
 }
 
+const SUCCESS_BUTTON_FEEDBACK_MS = 1800;
+const ERROR_BUTTON_FEEDBACK_MS = 3000;
+const NO_TRANSCRIPT_ERROR_MESSAGE = 'No captions found';
+
 class YoutubeTranscriptionExtension {
   static readTranscriptEntriesFromSegmentNodes(segmentNodes) {
     return getTranscriptDomApi().readTranscriptEntriesFromSegmentNodes(segmentNodes);
@@ -48,6 +52,7 @@ class YoutubeTranscriptionExtension {
     this.isExtracting = false;
     this.containerObserver = null;
     this.buttonCheckInterval = null;
+    this.buttonStateResetTimeout = null;
     this.potTokens = new Map();
     this.dom = getTranscriptDomApi();
     this.core = getTranscriptCoreApi();
@@ -119,6 +124,8 @@ class YoutubeTranscriptionExtension {
       clearInterval(this.buttonCheckInterval);
       this.buttonCheckInterval = null;
     }
+
+    this.clearButtonStateResetTimeout();
 
     if (this.transcriptButton && document.contains(this.transcriptButton)) {
       this.transcriptButton.remove();
@@ -216,22 +223,19 @@ class YoutubeTranscriptionExtension {
       return;
     }
 
+    this.clearButtonStateResetTimeout();
     this.isExtracting = true;
     this.updateButtonState('loading');
 
     try {
       const transcriptPackage = await this.extractTranscriptPackage();
       await this.copyTextToClipboard(transcriptPackage);
-      this.showUserNotification(
-        `Transcript copied to clipboard! (${transcriptPackage.body.length} characters)`,
-        'success'
-      );
+      this.showTemporaryButtonState('success', SUCCESS_BUTTON_FEEDBACK_MS);
     } catch (error) {
       console.error('Transcript extraction failed:', error);
-      this.showUserNotification(`Failed to get transcript: ${error.message}`, 'error');
+      this.showTemporaryButtonState(this.getFeedbackStateForError(error), ERROR_BUTTON_FEEDBACK_MS);
     } finally {
       this.isExtracting = false;
-      this.updateButtonState('normal');
     }
   }
 
@@ -288,8 +292,32 @@ class YoutubeTranscriptionExtension {
     this.dom.updateButtonState(this.transcriptButton, state);
   }
 
-  showUserNotification(message, type = 'info') {
-    this.dom.showUserNotification(document, message, type);
+  showTemporaryButtonState(state, duration) {
+    this.updateButtonState(state);
+    this.buttonStateResetTimeout = setTimeout(() => {
+      this.buttonStateResetTimeout = null;
+
+      if (!this.isExtracting) {
+        this.updateButtonState('normal');
+      }
+    }, duration);
+  }
+
+  clearButtonStateResetTimeout() {
+    if (!this.buttonStateResetTimeout) {
+      return;
+    }
+
+    clearTimeout(this.buttonStateResetTimeout);
+    this.buttonStateResetTimeout = null;
+  }
+
+  getFeedbackStateForError(error) {
+    if ((error?.message || '').includes(NO_TRANSCRIPT_ERROR_MESSAGE)) {
+      return 'no_transcript';
+    }
+
+    return 'error';
   }
 
   waitForMilliseconds(milliseconds) {

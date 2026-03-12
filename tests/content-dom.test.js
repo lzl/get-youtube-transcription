@@ -77,14 +77,21 @@ test('content-dom strips timestamp and accessibility label from fallback transcr
   );
 });
 
-test('content-dom creates the unchanged transcript button markup', () => {
+test('content-dom creates transcript button markup with accessible status text', () => {
   const button = dom.createTranscriptButton({
     createElement() {
       return {
         type: '',
         className: '',
         title: '',
+        ariaLabel: '',
+        dataset: {},
         innerHTML: '',
+        setAttribute(name, value) {
+          if (name === 'aria-label') {
+            this.ariaLabel = value;
+          }
+        },
         addEventListener() {},
       };
     },
@@ -93,7 +100,96 @@ test('content-dom creates the unchanged transcript button markup', () => {
   assert.equal(button.type, 'button');
   assert.equal(button.className, 'yt-transcript-extractor-btn');
   assert.equal(button.title, 'Get video transcript with one click');
-  assert.match(button.innerHTML, /<span>Transcript<\/span>/);
+  assert.equal(button.ariaLabel, 'Get video transcript with one click');
+  assert.match(button.innerHTML, /yt-transcript-button-label/);
+  assert.match(button.innerHTML, /yt-transcript-button-status/);
+});
+
+test('content-dom no longer exports the global notification helper', () => {
+  assert.equal(dom.showUserNotification, undefined);
+});
+
+function createStatefulButton() {
+  const label = { textContent: 'Transcript' };
+  const status = { textContent: '' };
+  const path = {
+    d: 'initial',
+    setAttribute(name, value) {
+      if (name === 'd') {
+        this.d = value;
+      }
+    },
+    getAttribute(name) {
+      if (name === 'd') {
+        return this.d;
+      }
+
+      return null;
+    },
+  };
+
+  const attributes = {
+    title: 'Get video transcript with one click',
+    'aria-label': 'Get video transcript with one click',
+  };
+
+  const button = {
+    disabled: false,
+    dataset: {},
+    title: attributes.title,
+    setAttribute(name, value) {
+      attributes[name] = value;
+
+      if (name === 'title') {
+        this.title = value;
+      }
+    },
+    getAttribute(name) {
+      return attributes[name] || null;
+    },
+    querySelector(selector) {
+      if (selector === '.yt-transcript-button-label' || selector === 'span') {
+        return label;
+      }
+
+      if (selector === '.yt-transcript-button-status') {
+        return status;
+      }
+
+      if (selector === 'svg path') {
+        return path;
+      }
+
+      return null;
+    },
+  };
+
+  return { button, label, status, path };
+}
+
+test('content-dom updates success button state with accessible copy feedback', () => {
+  const { button, label, status, path } = createStatefulButton();
+
+  dom.updateButtonState(button, 'success');
+
+  assert.equal(button.dataset.state, 'success');
+  assert.equal(button.disabled, false);
+  assert.equal(label.textContent, 'Copied transcript');
+  assert.equal(status.textContent, 'Transcript copied to clipboard');
+  assert.equal(button.title, 'Transcript copied to clipboard');
+  assert.equal(button.getAttribute('aria-label'), 'Transcript copied to clipboard');
+  assert.notEqual(path.getAttribute('d'), 'initial');
+});
+
+test('content-dom updates loading button state and keeps it disabled', () => {
+  const { button, label, status } = createStatefulButton();
+
+  dom.updateButtonState(button, 'loading');
+
+  assert.equal(button.dataset.state, 'loading');
+  assert.equal(button.disabled, true);
+  assert.equal(label.textContent, 'Getting transcript...');
+  assert.equal(status.textContent, 'Getting transcript...');
 });
 
 test('findTranscriptPanelButton returns the visible transcript section button', () => {
