@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 const dom = require('../content-dom.js');
 
+const TRANSCRIPT_TILE_ICON_PATH = 'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
+
 function createLegacySegment(timestamp, text) {
   return {
     querySelector(selector) {
@@ -103,6 +105,7 @@ test('content-dom creates transcript button markup with accessible status text',
   assert.equal(button.ariaLabel, 'Get video transcript with one click');
   assert.match(button.innerHTML, /yt-transcript-button-label/);
   assert.match(button.innerHTML, /yt-transcript-button-status/);
+  assert.equal(button.innerHTML.includes(`d="${TRANSCRIPT_TILE_ICON_PATH}"`), true);
 });
 
 test('content-dom no longer exports the global notification helper', () => {
@@ -226,7 +229,7 @@ test('content-dom updates success button state with accessible copy feedback', (
 });
 
 test('content-dom updates loading button state and keeps it disabled', () => {
-  const { button, label, status } = createStatefulButton();
+  const { button, label, status, path } = createStatefulButton();
 
   dom.updateButtonState(button, 'loading');
 
@@ -234,6 +237,7 @@ test('content-dom updates loading button state and keeps it disabled', () => {
   assert.equal(button.disabled, true);
   assert.equal(label.textContent, 'Getting transcript...');
   assert.equal(status.textContent, 'Getting transcript...');
+  assert.equal(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
 });
 
 test('content-dom animates button width when desktop label length changes', () => {
