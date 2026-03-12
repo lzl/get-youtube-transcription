@@ -32,12 +32,63 @@
     '#segments-container > ytd-transcript-segment-renderer',
   ].join(', ');
 
+  const DEFAULT_BUTTON_TITLE = 'Get video transcript with one click';
+  const BUTTON_WIDTH_TRANSITION_MS = 220;
+  const TRANSCRIPT_ICON_PATH = 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z';
+  const SUCCESS_ICON_PATH = 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
+  const NO_TRANSCRIPT_ICON_PATH = 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9.59L5 11.41 6.41 10 17 20.59V5H5v6.59L3.41 10 3 9.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v10.59L19.59 14H19V5zm-6.59 9L14 13.59 12.59 15H7v-2h5.41z';
+  const ERROR_ICON_PATH = 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z';
+
   const TRANSCRIPT_BUTTON_MARKUP = `
       <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"></path>
+        <path d="${TRANSCRIPT_ICON_PATH}"></path>
       </svg>
-      <span>Transcript</span>
+      <span class="yt-transcript-button-label">Transcript</span>
+      <span class="yt-transcript-button-status" aria-live="polite" aria-atomic="true"></span>
     `;
+
+  const BUTTON_STATES = {
+    normal: {
+      label: 'Transcript',
+      status: '',
+      title: DEFAULT_BUTTON_TITLE,
+      ariaLabel: DEFAULT_BUTTON_TITLE,
+      iconPath: TRANSCRIPT_ICON_PATH,
+      disabled: false,
+    },
+    loading: {
+      label: 'Getting transcript...',
+      status: 'Getting transcript...',
+      title: 'Getting transcript...',
+      ariaLabel: 'Getting transcript...',
+      iconPath: TRANSCRIPT_ICON_PATH,
+      disabled: true,
+    },
+    success: {
+      label: 'Copied transcript',
+      status: 'Transcript copied to clipboard',
+      title: 'Transcript copied to clipboard',
+      ariaLabel: 'Transcript copied to clipboard',
+      iconPath: SUCCESS_ICON_PATH,
+      disabled: false,
+    },
+    no_transcript: {
+      label: 'No transcript',
+      status: 'No transcript available',
+      title: 'No transcript available',
+      ariaLabel: 'No transcript available',
+      iconPath: NO_TRANSCRIPT_ICON_PATH,
+      disabled: false,
+    },
+    error: {
+      label: 'Failed',
+      status: 'Failed to get transcript',
+      title: 'Failed to get transcript',
+      ariaLabel: 'Failed to get transcript',
+      iconPath: ERROR_ICON_PATH,
+      disabled: false,
+    },
+  };
 
   function extractModernTranscriptFallbackText(segmentNode, timestamp) {
     let text = (segmentNode.textContent || '').trim();
@@ -106,10 +157,76 @@
     const button = documentRef.createElement('button');
     button.type = 'button';
     button.className = 'yt-transcript-extractor-btn';
-    button.title = 'Get video transcript with one click';
+    button.title = DEFAULT_BUTTON_TITLE;
+    button.setAttribute('aria-label', DEFAULT_BUTTON_TITLE);
+    button.dataset.state = 'normal';
     button.innerHTML = TRANSCRIPT_BUTTON_MARKUP;
     button.addEventListener('click', onClick);
     return button;
+  }
+
+  function prefersReducedMotion(button) {
+    return Boolean(button?.ownerDocument?.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+  }
+
+  function clearPendingWidthAnimation(button) {
+    if (!button?._transcriptWidthAnimationTimeout) {
+      return;
+    }
+
+    clearTimeout(button._transcriptWidthAnimationTimeout);
+    button._transcriptWidthAnimationTimeout = null;
+  }
+
+  function finishWidthAnimation(button) {
+    if (!button) {
+      return;
+    }
+
+    clearPendingWidthAnimation(button);
+    button.style.width = '';
+    button.classList?.remove('yt-transcript-extractor-btn--animating');
+  }
+
+  function measureNaturalButtonWidth(button) {
+    if (!button?.getBoundingClientRect || !button?.style) {
+      return 0;
+    }
+
+    const previousWidthStyle = button.style.width;
+    button.style.width = '';
+    const measuredWidth = button.getBoundingClientRect().width;
+    button.style.width = previousWidthStyle;
+    return Math.ceil(measuredWidth);
+  }
+
+  function animateButtonWidth(button, startWidth, endWidth) {
+    if (!button?.style) {
+      return;
+    }
+
+    clearPendingWidthAnimation(button);
+
+    if (
+      prefersReducedMotion(button) ||
+      !Number.isFinite(startWidth) ||
+      !Number.isFinite(endWidth) ||
+      startWidth <= 0 ||
+      endWidth <= 0 ||
+      startWidth === endWidth
+    ) {
+      finishWidthAnimation(button);
+      return;
+    }
+
+    button.classList?.add('yt-transcript-extractor-btn--animating');
+    button.style.width = `${Math.ceil(startWidth)}px`;
+    void button.offsetWidth;
+    button.style.width = `${Math.ceil(endWidth)}px`;
+    button._transcriptWidthAnimationTimeout = setTimeout(() => {
+      button._transcriptWidthAnimationTimeout = null;
+      finishWidthAnimation(button);
+    }, BUTTON_WIDTH_TRANSITION_MS);
   }
 
   function updateButtonState(button, state) {
@@ -117,37 +234,32 @@
       return;
     }
 
-    const label = button.querySelector('span');
+    const currentWidth = Math.ceil(button.getBoundingClientRect?.().width || 0);
+    const label = button.querySelector('.yt-transcript-button-label') || button.querySelector('span');
+    const status = button.querySelector('.yt-transcript-button-status');
+    const iconPath = button.querySelector('svg path');
+    const resolvedState = BUTTON_STATES[state] ? state : 'normal';
+    const nextState = BUTTON_STATES[resolvedState];
 
     if (!label) {
       return;
     }
 
-    if (state === 'loading') {
-      label.textContent = 'Loading...';
-      button.disabled = true;
-      return;
+    label.textContent = nextState.label;
+    button.disabled = nextState.disabled;
+    button.dataset.state = resolvedState;
+    button.title = nextState.title;
+    button.setAttribute('aria-label', nextState.ariaLabel);
+
+    if (status) {
+      status.textContent = nextState.status;
     }
 
-    label.textContent = 'Transcript';
-    button.disabled = false;
-  }
+    if (iconPath) {
+      iconPath.setAttribute('d', nextState.iconPath);
+    }
 
-  function showUserNotification(documentRef, message, type = 'info') {
-    const notification = documentRef.createElement('div');
-    notification.className = `yt-transcript-notification yt-transcript-notification-${type}`;
-    notification.textContent = message;
-    documentRef.body.appendChild(notification);
-
-    setTimeout(() => notification.classList.add('show'), 100);
-    setTimeout(() => {
-      notification.classList.remove('show');
-      setTimeout(() => {
-        if (documentRef.body.contains(notification)) {
-          documentRef.body.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
+    animateButtonWidth(button, currentWidth, measureNaturalButtonWidth(button));
   }
 
   function waitForMilliseconds(milliseconds) {
@@ -244,7 +356,6 @@
     isElementVisible,
     isValidWatchContainer,
     readTranscriptEntriesFromSegmentNodes,
-    showUserNotification,
     updateButtonState,
     waitForMilliseconds,
     waitForSelector,

@@ -1,4 +1,7 @@
 /* YouTube Transcription Extractor Styles */
+:root {
+  --yt-transcript-ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 /* 按钮样式 - 模仿 YouTube 原生操作按钮 */
 .yt-transcript-extractor-btn {
@@ -20,7 +23,12 @@
   height: 36px;
   min-width: 0;
   cursor: pointer;
-  transition: background-color 0.1s ease;
+  transition:
+    background-color 0.16s var(--yt-transcript-ease-out-quint),
+    color 0.16s var(--yt-transcript-ease-out-quint),
+    box-shadow 0.16s var(--yt-transcript-ease-out-quint),
+    opacity 0.16s var(--yt-transcript-ease-out-quint),
+    width 0.22s var(--yt-transcript-ease-out-quint);
   box-sizing: border-box;
   white-space: nowrap;
   outline: none;
@@ -77,105 +85,171 @@ html[system-theme="dark"] .yt-transcript-extractor-btn:active {
   fill: currentColor;
   opacity: 1;
   flex-shrink: 0;
+  transition:
+    transform 0.16s var(--yt-transcript-ease-out-quint),
+    opacity 0.16s var(--yt-transcript-ease-out-quint);
 }
 
-.yt-transcript-extractor-btn span {
+.yt-transcript-button-label {
   line-height: 36px;
   font-size: 14px;
 }
 
-/* 保持一致的样式，不区分主题 */
-/* 所有主题下都使用相同的样式，匹配 YouTube 操作按钮 */
-
-/* 通知样式 */
-.yt-transcript-notification {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  z-index: 9999;
-  background: #fff;
-  color: #333;
-  padding: 12px 16px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-family: "YouTube Sans", "Roboto", sans-serif;
-  font-size: 14px;
-  max-width: 300px;
-  word-wrap: break-word;
-  opacity: 0;
-  transform: translateX(100%);
-  transition: all 0.3s ease;
-  border-left: 4px solid #065fd4;
+.yt-transcript-button-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.yt-transcript-notification.show {
-  opacity: 1;
-  transform: translateX(0);
+.yt-transcript-extractor-btn--animating {
+  overflow: hidden;
 }
 
-.yt-transcript-notification-success {
-  border-left-color: #00b96b;
-  background: #f0f9f4;
-  color: #0d7c47;
+.yt-transcript-extractor-btn[data-state="success"] {
+  background: rgba(22, 163, 74, 0.14);
+  color: #166534;
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.18);
 }
 
-.yt-transcript-notification-error {
-  border-left-color: #d93025;
-  background: #fef7f0;
-  color: #c5221f;
+.yt-transcript-extractor-btn[data-state="success"]:hover {
+  background: rgba(22, 163, 74, 0.18);
 }
 
-.yt-transcript-notification-info {
-  border-left-color: #065fd4;
-  background: #f0f4ff;
-  color: #1a73e8;
+.yt-transcript-extractor-btn[data-state="success"]:active {
+  background: rgba(22, 163, 74, 0.22);
 }
 
-/* 暗色主题通知 */
+.yt-transcript-extractor-btn[data-state="success"] svg {
+  transform: scale(0.94);
+}
+
+.yt-transcript-extractor-btn[data-state="no_transcript"] {
+  background: rgba(180, 83, 9, 0.14);
+  color: #9a3412;
+  box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.18);
+}
+
+.yt-transcript-extractor-btn[data-state="no_transcript"]:hover {
+  background: rgba(180, 83, 9, 0.18);
+}
+
+.yt-transcript-extractor-btn[data-state="no_transcript"]:active {
+  background: rgba(180, 83, 9, 0.22);
+}
+
+.yt-transcript-extractor-btn[data-state="error"] {
+  background: rgba(220, 38, 38, 0.14);
+  color: #b91c1c;
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18);
+}
+
+.yt-transcript-extractor-btn[data-state="error"]:hover {
+  background: rgba(220, 38, 38, 0.18);
+}
+
+.yt-transcript-extractor-btn[data-state="error"]:active {
+  background: rgba(220, 38, 38, 0.22);
+}
+
 @media (prefers-color-scheme: dark) {
-  .yt-transcript-notification {
-    background: #3f3f3f;
-    color: #fff;
+  .yt-transcript-extractor-btn[data-state="success"] {
+    background: rgba(34, 197, 94, 0.24);
+    color: #86efac;
+    box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.2);
   }
-  
-  .yt-transcript-notification-success {
-    background: #1a5d1a;
-    color: #4caf50;
+
+  .yt-transcript-extractor-btn[data-state="success"]:hover {
+    background: rgba(34, 197, 94, 0.3);
   }
-  
-  .yt-transcript-notification-error {
-    background: #5d1a1a;
-    color: #f44336;
+
+  .yt-transcript-extractor-btn[data-state="success"]:active {
+    background: rgba(34, 197, 94, 0.36);
   }
-  
-  .yt-transcript-notification-info {
-    background: #1a3a5d;
-    color: #2196f3;
+
+  .yt-transcript-extractor-btn[data-state="no_transcript"] {
+    background: rgba(245, 158, 11, 0.22);
+    color: #fcd34d;
+    box-shadow: inset 0 0 0 1px rgba(252, 211, 77, 0.2);
+  }
+
+  .yt-transcript-extractor-btn[data-state="no_transcript"]:hover {
+    background: rgba(245, 158, 11, 0.28);
+  }
+
+  .yt-transcript-extractor-btn[data-state="no_transcript"]:active {
+    background: rgba(245, 158, 11, 0.34);
+  }
+
+  .yt-transcript-extractor-btn[data-state="error"] {
+    background: rgba(248, 113, 113, 0.22);
+    color: #fca5a5;
+    box-shadow: inset 0 0 0 1px rgba(252, 165, 165, 0.2);
+  }
+
+  .yt-transcript-extractor-btn[data-state="error"]:hover {
+    background: rgba(248, 113, 113, 0.28);
+  }
+
+  .yt-transcript-extractor-btn[data-state="error"]:active {
+    background: rgba(248, 113, 113, 0.34);
   }
 }
 
-html[dark] .yt-transcript-notification,
-html[system-theme="dark"] .yt-transcript-notification {
-  background: #3f3f3f;
-  color: #fff;
+html[dark] .yt-transcript-extractor-btn[data-state="success"],
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="success"] {
+  background: rgba(34, 197, 94, 0.24);
+  color: #86efac;
+  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.2);
 }
 
-html[dark] .yt-transcript-notification-success,
-html[system-theme="dark"] .yt-transcript-notification-success {
-  background: #1a5d1a;
-  color: #4caf50;
+html[dark] .yt-transcript-extractor-btn[data-state="success"]:hover,
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="success"]:hover {
+  background: rgba(34, 197, 94, 0.3);
 }
 
-html[dark] .yt-transcript-notification-error,
-html[system-theme="dark"] .yt-transcript-notification-error {
-  background: #5d1a1a;
-  color: #f44336;
+html[dark] .yt-transcript-extractor-btn[data-state="success"]:active,
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="success"]:active {
+  background: rgba(34, 197, 94, 0.36);
 }
 
-html[dark] .yt-transcript-notification-info,
-html[system-theme="dark"] .yt-transcript-notification-info {
-  background: #1a3a5d;
-  color: #2196f3;
+html[dark] .yt-transcript-extractor-btn[data-state="no_transcript"],
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="no_transcript"] {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fcd34d;
+  box-shadow: inset 0 0 0 1px rgba(252, 211, 77, 0.2);
+}
+
+html[dark] .yt-transcript-extractor-btn[data-state="no_transcript"]:hover,
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="no_transcript"]:hover {
+  background: rgba(245, 158, 11, 0.28);
+}
+
+html[dark] .yt-transcript-extractor-btn[data-state="no_transcript"]:active,
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="no_transcript"]:active {
+  background: rgba(245, 158, 11, 0.34);
+}
+
+html[dark] .yt-transcript-extractor-btn[data-state="error"],
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="error"] {
+  background: rgba(248, 113, 113, 0.22);
+  color: #fca5a5;
+  box-shadow: inset 0 0 0 1px rgba(252, 165, 165, 0.2);
+}
+
+html[dark] .yt-transcript-extractor-btn[data-state="error"]:hover,
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="error"]:hover {
+  background: rgba(248, 113, 113, 0.28);
+}
+
+html[dark] .yt-transcript-extractor-btn[data-state="error"]:active,
+html[system-theme="dark"] .yt-transcript-extractor-btn[data-state="error"]:active {
+  background: rgba(248, 113, 113, 0.34);
 }
 
 /* 适配不同的 YouTube 布局 */
@@ -195,7 +269,7 @@ html[system-theme="dark"] .yt-transcript-notification-info {
     height: 24px;
   }
   
-  .yt-transcript-extractor-btn span {
+  .yt-transcript-button-label {
     line-height: 36px;
   }
 }
@@ -216,7 +290,7 @@ html[system-theme="dark"] .yt-transcript-notification-info {
 }
 
 @media (max-width: 768px) {
-  .yt-transcript-extractor-btn span {
+  .yt-transcript-button-label {
     display: none;
   }
   
@@ -236,13 +310,6 @@ html[system-theme="dark"] .yt-transcript-notification-info {
   .yt-transcript-extractor-btn svg {
     width: 24px;
     height: 24px;
-  }
-  
-  .yt-transcript-notification {
-    top: 60px;
-    right: 10px;
-    left: 10px;
-    max-width: none;
   }
 }
 
@@ -307,4 +374,16 @@ ytd-watch-flexy[theater] .yt-transcript-extractor-btn {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-} 
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yt-transcript-extractor-btn,
+  .yt-transcript-extractor-btn svg {
+    transition: none !important;
+  }
+
+  .yt-transcript-extractor-btn:disabled svg {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
+}

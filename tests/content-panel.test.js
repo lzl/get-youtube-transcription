@@ -67,3 +67,126 @@ test('readTranscriptEntriesFromSegmentNodes falls back to stripped text when mod
 
   assert.deepEqual(entries, [['1:24', 'about it in the first sort']]);
 });
+
+function withStubbedTimers(run) {
+  const timers = [];
+  const clearedTimers = [];
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+
+  global.setTimeout = (callback, delay) => {
+    const timer = { callback, delay };
+    timers.push(timer);
+    return timer;
+  };
+
+  global.clearTimeout = (timer) => {
+    clearedTimers.push(timer);
+  };
+
+  return Promise.resolve()
+    .then(() => run({ timers, clearedTimers }))
+    .finally(() => {
+      global.setTimeout = originalSetTimeout;
+      global.clearTimeout = originalClearTimeout;
+    });
+}
+
+test('handleTranscriptButtonClick shows success feedback before resetting to normal', async () => {
+  await withStubbedTimers(async ({ timers }) => {
+    const updates = [];
+    const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+    extension.isExtracting = false;
+    extension.buttonStateResetTimeout = null;
+    extension.updateButtonState = (state) => {
+      updates.push(state);
+    };
+    extension.extractTranscriptPackage = async () => ({ body: '0:01: first line' });
+    extension.copyTextToClipboard = async () => {};
+
+    await extension.handleTranscriptButtonClick();
+
+    assert.deepEqual(updates, ['loading', 'success']);
+    assert.equal(timers.length, 1);
+    assert.equal(timers[0].delay, 1800);
+
+    timers[0].callback();
+
+    assert.deepEqual(updates, ['loading', 'success', 'normal']);
+    assert.equal(extension.isExtracting, false);
+  });
+});
+
+test('handleTranscriptButtonClick clears any pending feedback reset when clicked again', async () => {
+  await withStubbedTimers(async ({ clearedTimers }) => {
+    const pendingTimer = { id: 'pending' };
+    const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+    extension.isExtracting = false;
+    extension.buttonStateResetTimeout = pendingTimer;
+    extension.updateButtonState = () => {};
+    extension.extractTranscriptPackage = async () => ({ body: '0:01: first line' });
+    extension.copyTextToClipboard = async () => {};
+
+    await extension.handleTranscriptButtonClick();
+
+    assert.deepEqual(clearedTimers, [pendingTimer]);
+  });
+});
+
+test('handleTranscriptButtonClick maps missing transcript errors to no_transcript feedback', async () => {
+  await withStubbedTimers(async ({ timers }) => {
+    const updates = [];
+    const originalConsoleError = console.error;
+    console.error = () => {};
+
+    try {
+      const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+      extension.isExtracting = false;
+      extension.buttonStateResetTimeout = null;
+      extension.updateButtonState = (state) => {
+        updates.push(state);
+      };
+      extension.extractTranscriptPackage = async () => {
+        throw new Error('No captions found. This video may not have a transcript available.');
+      };
+      extension.copyTextToClipboard = async () => {};
+
+      await extension.handleTranscriptButtonClick();
+
+      assert.deepEqual(updates, ['loading', 'no_transcript']);
+      assert.equal(timers.length, 1);
+      assert.equal(timers[0].delay, 3000);
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+});
+
+test('handleTranscriptButtonClick maps clipboard failures to error feedback', async () => {
+  await withStubbedTimers(async ({ timers }) => {
+    const updates = [];
+    const originalConsoleError = console.error;
+    console.error = () => {};
+
+    try {
+      const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+      extension.isExtracting = false;
+      extension.buttonStateResetTimeout = null;
+      extension.updateButtonState = (state) => {
+        updates.push(state);
+      };
+      extension.extractTranscriptPackage = async () => ({ body: '0:01: first line' });
+      extension.copyTextToClipboard = async () => {
+        throw new Error('Clipboard blocked');
+      };
+
+      await extension.handleTranscriptButtonClick();
+
+      assert.deepEqual(updates, ['loading', 'error']);
+      assert.equal(timers.length, 1);
+      assert.equal(timers[0].delay, 3000);
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+});
