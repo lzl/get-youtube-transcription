@@ -1,4 +1,7 @@
 /* YouTube Transcription Extractor Styles */
+:root {
+  --yt-transcript-ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 /* 按钮样式 - 模仿 YouTube 原生操作按钮 */
 .yt-transcript-extractor-btn {
@@ -21,10 +24,11 @@
   min-width: 0;
   cursor: pointer;
   transition:
-    background-color 0.16s ease,
-    color 0.16s ease,
-    box-shadow 0.16s ease,
-    opacity 0.16s ease;
+    background-color 0.16s var(--yt-transcript-ease-out-quint),
+    color 0.16s var(--yt-transcript-ease-out-quint),
+    box-shadow 0.16s var(--yt-transcript-ease-out-quint),
+    opacity 0.16s var(--yt-transcript-ease-out-quint),
+    width 0.22s var(--yt-transcript-ease-out-quint);
   box-sizing: border-box;
   white-space: nowrap;
   outline: none;
@@ -81,7 +85,9 @@ html[system-theme="dark"] .yt-transcript-extractor-btn:active {
   fill: currentColor;
   opacity: 1;
   flex-shrink: 0;
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  transition:
+    transform 0.16s var(--yt-transcript-ease-out-quint),
+    opacity 0.16s var(--yt-transcript-ease-out-quint);
 }
 
 .yt-transcript-button-label {
@@ -99,6 +105,10 @@ html[system-theme="dark"] .yt-transcript-extractor-btn:active {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.yt-transcript-extractor-btn--animating {
+  overflow: hidden;
 }
 
 .yt-transcript-extractor-btn[data-state="success"] {
@@ -364,4 +374,16 @@ ytd-watch-flexy[theater] .yt-transcript-extractor-btn {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yt-transcript-extractor-btn,
+  .yt-transcript-extractor-btn svg {
+    transition: none !important;
+  }
+
+  .yt-transcript-extractor-btn:disabled svg {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
 }

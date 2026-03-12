@@ -33,6 +33,7 @@
   ].join(', ');
 
   const DEFAULT_BUTTON_TITLE = 'Get video transcript with one click';
+  const BUTTON_WIDTH_TRANSITION_MS = 220;
   const TRANSCRIPT_ICON_PATH = 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z';
   const SUCCESS_ICON_PATH = 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
   const NO_TRANSCRIPT_ICON_PATH = 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9.59L5 11.41 6.41 10 17 20.59V5H5v6.59L3.41 10 3 9.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v10.59L19.59 14H19V5zm-6.59 9L14 13.59 12.59 15H7v-2h5.41z';
@@ -164,11 +165,76 @@
     return button;
   }
 
+  function prefersReducedMotion(button) {
+    return Boolean(button?.ownerDocument?.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+  }
+
+  function clearPendingWidthAnimation(button) {
+    if (!button?._transcriptWidthAnimationTimeout) {
+      return;
+    }
+
+    clearTimeout(button._transcriptWidthAnimationTimeout);
+    button._transcriptWidthAnimationTimeout = null;
+  }
+
+  function finishWidthAnimation(button) {
+    if (!button) {
+      return;
+    }
+
+    clearPendingWidthAnimation(button);
+    button.style.width = '';
+    button.classList?.remove('yt-transcript-extractor-btn--animating');
+  }
+
+  function measureNaturalButtonWidth(button) {
+    if (!button?.getBoundingClientRect || !button?.style) {
+      return 0;
+    }
+
+    const previousWidthStyle = button.style.width;
+    button.style.width = '';
+    const measuredWidth = button.getBoundingClientRect().width;
+    button.style.width = previousWidthStyle;
+    return Math.ceil(measuredWidth);
+  }
+
+  function animateButtonWidth(button, startWidth, endWidth) {
+    if (!button?.style) {
+      return;
+    }
+
+    clearPendingWidthAnimation(button);
+
+    if (
+      prefersReducedMotion(button) ||
+      !Number.isFinite(startWidth) ||
+      !Number.isFinite(endWidth) ||
+      startWidth <= 0 ||
+      endWidth <= 0 ||
+      startWidth === endWidth
+    ) {
+      finishWidthAnimation(button);
+      return;
+    }
+
+    button.classList?.add('yt-transcript-extractor-btn--animating');
+    button.style.width = `${Math.ceil(startWidth)}px`;
+    void button.offsetWidth;
+    button.style.width = `${Math.ceil(endWidth)}px`;
+    button._transcriptWidthAnimationTimeout = setTimeout(() => {
+      button._transcriptWidthAnimationTimeout = null;
+      finishWidthAnimation(button);
+    }, BUTTON_WIDTH_TRANSITION_MS);
+  }
+
   function updateButtonState(button, state) {
     if (!button) {
       return;
     }
 
+    const currentWidth = Math.ceil(button.getBoundingClientRect?.().width || 0);
     const label = button.querySelector('.yt-transcript-button-label') || button.querySelector('span');
     const status = button.querySelector('.yt-transcript-button-status');
     const iconPath = button.querySelector('svg path');
@@ -192,6 +258,8 @@
     if (iconPath) {
       iconPath.setAttribute('d', nextState.iconPath);
     }
+
+    animateButtonWidth(button, currentWidth, measureNaturalButtonWidth(button));
   }
 
   function waitForMilliseconds(milliseconds) {

@@ -136,13 +136,57 @@ function createStatefulButton() {
   const button = {
     disabled: false,
     dataset: {},
+    style: {},
+    offsetWidth: 96,
     title: attributes.title,
+    ownerDocument: {
+      defaultView: {
+        matchMedia() {
+          return { matches: false };
+        },
+      },
+    },
+    classList: {
+      values: new Set(),
+      add(value) {
+        this.values.add(value);
+      },
+      remove(value) {
+        this.values.delete(value);
+      },
+      contains(value) {
+        return this.values.has(value);
+      },
+    },
     setAttribute(name, value) {
       attributes[name] = value;
 
       if (name === 'title') {
         this.title = value;
       }
+    },
+    getBoundingClientRect() {
+      if (this.style.width) {
+        return { width: Number.parseFloat(this.style.width) || 96 };
+      }
+
+      if (label.textContent === 'Copied transcript') {
+        return { width: 156 };
+      }
+
+      if (label.textContent === 'Getting transcript...') {
+        return { width: 170 };
+      }
+
+      if (label.textContent === 'No transcript') {
+        return { width: 138 };
+      }
+
+      if (label.textContent === 'Failed') {
+        return { width: 108 };
+      }
+
+      return { width: 96 };
     },
     getAttribute(name) {
       return attributes[name] || null;
@@ -190,6 +234,39 @@ test('content-dom updates loading button state and keeps it disabled', () => {
   assert.equal(button.disabled, true);
   assert.equal(label.textContent, 'Getting transcript...');
   assert.equal(status.textContent, 'Getting transcript...');
+});
+
+test('content-dom animates button width when desktop label length changes', () => {
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const timers = [];
+
+  global.setTimeout = (callback, delay) => {
+    const timer = { callback, delay };
+    timers.push(timer);
+    return timer;
+  };
+
+  global.clearTimeout = () => {};
+
+  try {
+    const { button } = createStatefulButton();
+
+    dom.updateButtonState(button, 'success');
+
+    assert.equal(button.style.width, '156px');
+    assert.equal(button.classList.contains('yt-transcript-extractor-btn--animating'), true);
+    assert.equal(timers.length, 1);
+    assert.equal(timers[0].delay, 220);
+
+    timers[0].callback();
+
+    assert.equal(button.style.width, '');
+    assert.equal(button.classList.contains('yt-transcript-extractor-btn--animating'), false);
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
 });
 
 test('findTranscriptPanelButton returns the visible transcript section button', () => {
