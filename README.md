@@ -4,6 +4,8 @@
 
 This is a Chrome extension for YouTube. It adds a `Transcript` button to YouTube video pages. Click the button to get the transcript and copy it to your clipboard.
 
+![YouTube page showing the Transcript button](screenshot.png)
+
 ## Install
 
 1. Open `chrome://extensions/` in Chrome.
