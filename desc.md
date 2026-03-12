@@ -4,10 +4,9 @@ A privacy-first Chrome extension that adds a "Transcript" button to YouTube vide
 
 🛡️ YouTube-only access:
 - Only requests `https://www.youtube.com/*`
-- No access to the rest of your browsing data
+- Open source code - https://github.com/lzl/get-youtube-transcription - Verify yourself
 - No third-party transcript backend
 - No transcript data collection
-- Open source code - Verify the behavior yourself
 
 ⏰ Smart Timestamp Integration:
 - Every transcript line includes precise timestamps (e.g., "2:45: The main point is...")
@@ -17,9 +16,9 @@ A privacy-first Chrome extension that adds a "Transcript" button to YouTube vide
 Why choose this YouTube-only extension:
 ✅ Narrow permission scope - YouTube only
 ✅ YouTube's official transcripts - Same accuracy as YouTube's native feature
-✅ Direct retrieval from YouTube page data and transcript endpoints
+✅ Direct retrieval from YouTube data
 ✅ Forever free - No subscriptions, no limits, no upsells
-✅ Minimal footprint - Only 50KB, no bloat
+✅ Minimal footprint - Only ~20KB, no bloat
 
 Perfect for:
 - Students creating study notes with precise video references
