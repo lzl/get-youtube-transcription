@@ -12,7 +12,6 @@
   const HOME_CARD_SELECTOR = 'ytd-rich-grid-renderer ytd-rich-item-renderer';
   const WATCH_LINK_SELECTOR = 'a[href*="/watch"]';
   const HOVER_BUTTON_SELECTOR = 'ytd-thumbnail-overlay-toggle-button-renderer';
-  const MODERN_PREVIEW_PLAYER_SELECTOR = '#inline-preview-player';
   const MODERN_PREVIEW_CONTROLS_SELECTOR =
     'yt-inline-player-controls .ytInlinePlayerControlsTopRightControls';
   const MODERN_PREVIEW_FALLBACK_SELECTOR = '.ytInlinePlayerControlsTopRightControls';
@@ -34,6 +33,14 @@
     }
 
     return Array.from(documentRef.querySelectorAll(HOME_CARD_SELECTOR));
+  }
+
+  function getQueryMatches(root, selector) {
+    if (!root?.querySelectorAll) {
+      return [];
+    }
+
+    return Array.from(root.querySelectorAll(selector));
   }
 
   function toCanonicalWatchUrl(href, origin) {
@@ -219,15 +226,40 @@
     return lastNativeButton?.parentNode || lastNativeButton?.parentElement || card?.toolbar || null;
   }
 
+  function hasInjectedModernPlayerButton(controlsContainer) {
+    return Boolean(
+      controlsContainer?.querySelector?.(
+        `[${INJECTED_BUTTON_ATTR}="true"].${MODERN_PLAYER_BUTTON_CLASS}`
+      )
+    );
+  }
+
   function findModernPreviewControlsContainer(documentRef, card) {
-    const previewPlayer = documentRef?.querySelector?.(MODERN_PREVIEW_PLAYER_SELECTOR);
-    const controlsContainer =
-      documentRef?.querySelector?.(MODERN_PREVIEW_CONTROLS_SELECTOR) ||
-      documentRef?.querySelector?.(MODERN_PREVIEW_FALLBACK_SELECTOR) ||
-      previewPlayer?.querySelector?.(MODERN_PREVIEW_CONTROLS_SELECTOR) ||
-      previewPlayer?.querySelector?.(MODERN_PREVIEW_FALLBACK_SELECTOR) ||
-      card?.querySelector?.(MODERN_PREVIEW_CONTROLS_SELECTOR) ||
-      card?.querySelector?.(MODERN_PREVIEW_FALLBACK_SELECTOR);
+    const candidates = [
+      ...getQueryMatches(card, MODERN_PREVIEW_CONTROLS_SELECTOR),
+      ...getQueryMatches(card, MODERN_PREVIEW_FALLBACK_SELECTOR),
+      ...getQueryMatches(documentRef, MODERN_PREVIEW_CONTROLS_SELECTOR),
+      ...getQueryMatches(documentRef, MODERN_PREVIEW_FALLBACK_SELECTOR),
+    ];
+    const uniqueCandidates = [];
+    const seenCandidates = new Set();
+
+    for (const candidate of candidates) {
+      if (!candidate?.appendChild || seenCandidates.has(candidate)) {
+        continue;
+      }
+
+      seenCandidates.add(candidate);
+      uniqueCandidates.push(candidate);
+    }
+
+    for (let index = uniqueCandidates.length - 1; index >= 0; index -= 1) {
+      if (!hasInjectedModernPlayerButton(uniqueCandidates[index])) {
+        return uniqueCandidates[index];
+      }
+    }
+
+    const controlsContainer = uniqueCandidates[uniqueCandidates.length - 1] || null;
 
     if (!controlsContainer?.appendChild) {
       return null;
@@ -257,14 +289,26 @@
   }) {
     let observer = null;
     let currentHoveredWatchUrl = null;
+    let currentHoveredCard = null;
     let pendingPreviewRefreshTimeout = null;
+    let pendingPreviewSeed = null;
     const trackedCards = new Set();
 
-    function hasModernPlayerButton() {
+    function shouldContinueModernPreviewRefresh() {
+      const latestControlsContainer = findModernPreviewControlsContainer(documentRef, currentHoveredCard);
+
+      if (!latestControlsContainer) {
+        return true;
+      }
+
+      if (!hasInjectedModernPlayerButton(latestControlsContainer)) {
+        return true;
+      }
+
       return Boolean(
-        documentRef?.querySelector?.(
-          `[${INJECTED_BUTTON_ATTR}="true"].${MODERN_PLAYER_BUTTON_CLASS}`
-        )
+        pendingPreviewSeed?.hadInjectedButton &&
+          pendingPreviewSeed?.controlsContainer &&
+          latestControlsContainer === pendingPreviewSeed.controlsContainer
       );
     }
 
@@ -281,7 +325,7 @@
         pendingPreviewRefreshTimeout = null;
         refresh();
 
-        if (!hasModernPlayerButton()) {
+        if (shouldContinueModernPreviewRefresh()) {
           scheduleModernPreviewRefresh(attemptsRemaining - 1);
         }
       }, 120);
@@ -293,7 +337,21 @@
       }
 
       const updateCurrentWatchUrl = () => {
-        currentHoveredWatchUrl = getCardWatchUrl(card, windowRef) || currentHoveredWatchUrl;
+        const nextWatchUrl = getCardWatchUrl(card, windowRef) || currentHoveredWatchUrl;
+        const seedControlsContainer = findModernPreviewControlsContainer(documentRef, card);
+        const urlChanged = nextWatchUrl !== currentHoveredWatchUrl;
+
+        currentHoveredCard = card;
+        currentHoveredWatchUrl = nextWatchUrl;
+        pendingPreviewSeed = {
+          controlsContainer: seedControlsContainer,
+          hadInjectedButton: hasInjectedModernPlayerButton(seedControlsContainer),
+        };
+
+        if (!urlChanged && pendingPreviewSeed.hadInjectedButton) {
+          return;
+        }
+
         scheduleModernPreviewRefresh();
       };
 
@@ -345,11 +403,7 @@
         return;
       }
 
-      const existingModernButton = modernControlsContainer.querySelector?.(
-        `[${INJECTED_BUTTON_ATTR}="true"].${MODERN_PLAYER_BUTTON_CLASS}`
-      );
-
-      if (existingModernButton) {
+      if (hasInjectedModernPlayerButton(modernControlsContainer)) {
         return;
       }
 
@@ -399,6 +453,10 @@
         clearTimeoutFn(pendingPreviewRefreshTimeout);
         pendingPreviewRefreshTimeout = null;
       }
+
+      pendingPreviewSeed = null;
+      currentHoveredCard = null;
+      currentHoveredWatchUrl = null;
 
       if (!observer) {
         return;

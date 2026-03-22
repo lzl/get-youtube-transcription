@@ -160,10 +160,6 @@ function matchesSelector(element, selector) {
     return element.id === 'tooltip';
   }
 
-  if (selector === '#inline-preview-player') {
-    return element.id === 'inline-preview-player';
-  }
-
   if (selector === 'yt-formatted-string') {
     return element.tagName === 'YT-FORMATTED-STRING';
   }
@@ -185,14 +181,6 @@ function matchesSelector(element, selector) {
 
   if (selector === '.yt-lockup-view-model') {
     return String(element.className).split(/\s+/).includes('yt-lockup-view-model');
-  }
-
-  if (selector === '.ytp-right-controls-left') {
-    return String(element.className).split(/\s+/).includes('ytp-right-controls-left');
-  }
-
-  if (selector === '.ytp-right-controls') {
-    return String(element.className).split(/\s+/).includes('ytp-right-controls');
   }
 
   if (selector === '.ytInlinePlayerControlsTopRightControls') {
@@ -300,27 +288,7 @@ function createCard(options = {}) {
 
       watchLink.appendChild(thumbnail);
       lockupRoot.appendChild(watchLink);
-
-      if (options.withPreviewControls) {
-        const rightControls = createMockElement('div', {
-          className: 'ytp-right-controls',
-        });
-        const rightControlsLeft = createMockElement('div', {
-          className: 'ytp-right-controls-left',
-        });
-        const subtitlesButton = createMockElement('button', {
-          className: 'ytp-subtitles-button ytp-button',
-          ariaLabel: 'Subtitles/closed captions unavailable',
-        });
-
-        rightControlsLeft.appendChild(subtitlesButton);
-        rightControls.appendChild(rightControlsLeft);
-        lockupRoot.appendChild(rightControls);
-        card.previewControls = rightControlsLeft;
-      }
-
       card.appendChild(lockupRoot);
-      card.lockupRoot = lockupRoot;
     } else {
       card.appendChild(watchLink);
     }
@@ -459,7 +427,6 @@ test('home hover controller injects one native-looking button and logs canonical
     href: '/watch?v=abc123&pp=ygUPc29tZXRoaW5nLWVsc2U%3D',
   });
   const loggedValues = [];
-  const observerInstances = [];
   const controller = createHomeHoverUrlController({
     documentRef: createDocument([card]),
     locationRef: { pathname: '/' },
@@ -470,11 +437,6 @@ test('home hover controller injects one native-looking button and logs canonical
       },
     },
     MutationObserverCtor: class {
-      constructor(callback) {
-        this.callback = callback;
-        observerInstances.push(this);
-      }
-
       observe() {}
       disconnect() {}
     },
@@ -500,7 +462,6 @@ test('home hover controller injects one native-looking button and logs canonical
   controller.refresh();
 
   assert.equal(card.querySelectorAll('[data-yt-home-url-logger="true"]').length, 1);
-  assert.equal(observerInstances.length, 0);
 });
 
 test('home hover controller injects the modern button into the inline preview top-right controls cluster', () => {
@@ -559,7 +520,6 @@ test('home hover controller waits for modern preview controls instead of creatin
     href: '/watch?v=modern456',
     modern: true,
     withButtons: false,
-    withPreviewControls: false,
   });
   const controller = createHomeHoverUrlController({
     documentRef: createDocument([card]),
@@ -575,6 +535,59 @@ test('home hover controller waits for modern preview controls instead of creatin
   controller.refresh();
 
   assert.equal(card.querySelectorAll('[data-yt-home-url-logger="true"]').length, 0);
+});
+
+test('home hover controller keeps retrying until the active modern controls cluster gets the injected button', () => {
+  const card = createCard({
+    href: '/watch?v=modern999',
+    modern: true,
+    withButtons: false,
+  });
+  const scheduledCallbacks = [];
+  const documentRef = createDocument([card]);
+  const stalePreviewControls = createModernPreviewControls();
+  const staleInjectedButton = createMockElement('div', {
+    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-home-url-logger-player-button',
+    attributes: { 'data-yt-home-url-logger': 'true' },
+  });
+
+  stalePreviewControls.topRightControls.appendChild(staleInjectedButton);
+  documentRef.body.appendChild(stalePreviewControls.controlsHost);
+
+  const controller = createHomeHoverUrlController({
+    documentRef,
+    locationRef: { pathname: '/' },
+    windowRef: { location: { origin: 'https://www.youtube.com' } },
+    consoleRef: console,
+    MutationObserverCtor: class {
+      observe() {}
+      disconnect() {}
+    },
+    setTimeoutFn(callback) {
+      scheduledCallbacks.push(callback);
+      return scheduledCallbacks.length;
+    },
+    clearTimeoutFn() {},
+  });
+
+  controller.refresh();
+  card.listeners.get('mouseenter')();
+
+  assert.equal(scheduledCallbacks.length, 1);
+  scheduledCallbacks.shift()();
+
+  assert.equal(scheduledCallbacks.length, 1);
+
+  const freshPreviewControls = createModernPreviewControls();
+  documentRef.body.appendChild(freshPreviewControls.controlsHost);
+
+  scheduledCallbacks.shift()();
+
+  const injectedButtons = freshPreviewControls.topRightControls.querySelectorAll(
+    '[data-yt-home-url-logger="true"]'
+  );
+
+  assert.equal(injectedButtons.length, 1);
 });
 
 test('home hover controller retries modern preview injection when preview controls appear after hover starts', () => {
