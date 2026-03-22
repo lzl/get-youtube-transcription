@@ -90,6 +90,21 @@
     },
   };
 
+  const HOVER_WRAPPER_STATE_STYLES = {
+    success: {
+      boxShadow: 'inset 0 0 0 1px #86efac',
+      color: '#86efac',
+    },
+    no_transcript: {
+      boxShadow: 'inset 0 0 0 1px #fcd34d',
+      color: '#fcd34d',
+    },
+    error: {
+      boxShadow: 'inset 0 0 0 1px #fca5a5',
+      color: '#fca5a5',
+    },
+  };
+
   function extractModernTranscriptFallbackText(segmentNode, timestamp) {
     let text = (segmentNode.textContent || '').trim();
     const accessibilityLabel = segmentNode.querySelector('.ytwTranscriptSegmentViewModelTimestampA11yLabel')
@@ -262,6 +277,34 @@
     animateButtonWidth(button, currentWidth, measureNaturalButtonWidth(button));
   }
 
+  function elementHasClass(element, className) {
+    if (!element || !className) {
+      return false;
+    }
+
+    if (element.classList?.contains) {
+      return element.classList.contains(className);
+    }
+
+    return String(element.className || '')
+      .split(/\s+/)
+      .includes(className);
+  }
+
+  function findAncestorByClassName(element, className) {
+    let current = element?.parentElement || element?.parentNode || null;
+
+    while (current) {
+      if (elementHasClass(current, className)) {
+        return current;
+      }
+
+      current = current.parentElement || current.parentNode || null;
+    }
+
+    return null;
+  }
+
   function updateHoverButtonState(button, state) {
     if (!button) {
       return;
@@ -270,9 +313,17 @@
     const resolvedState = BUTTON_STATES[state] ? state : 'normal';
     const nextState = BUTTON_STATES[resolvedState];
     const iconPath = button.querySelector?.('svg path');
+    const wrapper = findAncestorByClassName(button, 'yt-home-transcript-player-button');
 
     button.disabled = nextState.disabled;
     button.dataset.state = resolvedState;
+    if (wrapper?.dataset) {
+      wrapper.dataset.state = resolvedState;
+    }
+    if (wrapper?.style) {
+      wrapper.style.boxShadow = HOVER_WRAPPER_STATE_STYLES[resolvedState]?.boxShadow || '';
+      wrapper.style.color = HOVER_WRAPPER_STATE_STYLES[resolvedState]?.color || '';
+    }
     button.title = nextState.title;
     button.setAttribute?.('title', nextState.title);
     button.setAttribute?.('aria-label', nextState.ariaLabel);

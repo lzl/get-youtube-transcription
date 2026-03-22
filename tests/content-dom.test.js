@@ -215,6 +215,11 @@ function createStatefulButton() {
 }
 
 function createHoverStatefulButton() {
+  const wrapper = {
+    dataset: {},
+    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-home-transcript-player-button',
+    style: {},
+  };
   const path = {
     d: 'initial',
     setAttribute(name, value) {
@@ -237,6 +242,8 @@ function createHoverStatefulButton() {
   const button = {
     disabled: false,
     dataset: {},
+    parentNode: wrapper,
+    parentElement: wrapper,
     title: attributes.title,
     setAttribute(name, value) {
       attributes[name] = value;
@@ -292,10 +299,28 @@ test('content-dom updates hover button state without watch-button width animatio
   dom.updateHoverButtonState(button, 'success');
 
   assert.equal(button.dataset.state, 'success');
+  assert.equal(button.parentNode.dataset.state, 'success');
+  assert.equal(button.parentNode.style.boxShadow, 'inset 0 0 0 1px #86efac');
+  assert.equal(button.parentNode.style.color, '#86efac');
   assert.equal(button.disabled, false);
   assert.equal(button.title, 'Transcript copied to clipboard');
   assert.equal(button.getAttribute('aria-label'), 'Transcript copied to clipboard');
   assert.notEqual(path.getAttribute('d'), 'initial');
+});
+
+test('content-dom updates hover button loading state and keeps it disabled', () => {
+  const { button, path } = createHoverStatefulButton();
+
+  dom.updateHoverButtonState(button, 'loading');
+
+  assert.equal(button.dataset.state, 'loading');
+  assert.equal(button.parentNode.dataset.state, 'loading');
+  assert.equal(button.parentNode.style.boxShadow, '');
+  assert.equal(button.parentNode.style.color, '');
+  assert.equal(button.disabled, true);
+  assert.equal(button.title, 'Getting transcript...');
+  assert.equal(button.getAttribute('aria-label'), 'Getting transcript...');
+  assert.equal(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
 });
 
 test('content-dom animates button width when desktop label length changes', () => {

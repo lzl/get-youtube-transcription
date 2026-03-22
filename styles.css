@@ -3,25 +3,134 @@
   --yt-transcript-ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.yt-home-url-logger-player-button {
+.yt-home-transcript-player-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   vertical-align: top;
+  border-radius: 999px;
+  box-shadow: none;
+  transition:
+    box-shadow 0.16s var(--yt-transcript-ease-out-quint),
+    color 0.16s var(--yt-transcript-ease-out-quint);
 }
 
-.yt-home-url-logger-player-button button {
-  background: transparent;
+.yt-home-transcript-player-button button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
   border: 0;
-  color: inherit;
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffff;
   cursor: pointer;
+  transition:
+    background-color 0.16s var(--yt-transcript-ease-out-quint),
+    color 0.16s var(--yt-transcript-ease-out-quint),
+    box-shadow 0.16s var(--yt-transcript-ease-out-quint),
+    transform 0.16s var(--yt-transcript-ease-out-quint);
+  box-shadow: none;
 }
 
-.yt-home-url-logger-player-button svg {
+.yt-home-transcript-player-button button:hover {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button button:active {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button svg {
   width: 20px;
   height: 20px;
   fill: currentColor;
   pointer-events: none;
+  transition:
+    transform 0.16s var(--yt-transcript-ease-out-quint),
+    opacity 0.16s var(--yt-transcript-ease-out-quint);
+}
+
+.yt-home-transcript-player-button button[data-state="success"] {
+  background: transparent;
+  color: #86efac;
+}
+
+.yt-home-transcript-player-button button[data-state="success"]:hover {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button button[data-state="success"]:active {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button button[data-state="success"] svg {
+  transform: scale(0.94);
+}
+
+.yt-home-transcript-player-button button[data-state="no_transcript"] {
+  background: transparent;
+  color: #fcd34d;
+}
+
+.yt-home-transcript-player-button button[data-state="no_transcript"]:hover {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button button[data-state="no_transcript"]:active {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button button[data-state="error"] {
+  background: transparent;
+  color: #fca5a5;
+}
+
+.yt-home-transcript-player-button button[data-state="error"]:hover {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button button[data-state="error"]:active {
+  background: transparent;
+}
+
+.yt-home-transcript-player-button button:disabled {
+  opacity: 1;
+  cursor: progress;
+  pointer-events: none;
+}
+
+.yt-home-transcript-player-button button:disabled svg {
+  animation: spin 1s linear infinite;
+}
+
+.ytInlinePlayerControlsTopRightControlsCircleButton.yt-home-transcript-player-button[data-state="success"] {
+  box-shadow: inset 0 0 0 1px #86efac !important;
+  color: #86efac !important;
+}
+
+.ytInlinePlayerControlsTopRightControlsCircleButton.yt-home-transcript-player-button[data-state="no_transcript"] {
+  box-shadow: inset 0 0 0 1px #fcd34d !important;
+  color: #fcd34d !important;
+}
+
+.ytInlinePlayerControlsTopRightControlsCircleButton.yt-home-transcript-player-button[data-state="error"] {
+  box-shadow: inset 0 0 0 1px #fca5a5 !important;
+  color: #fca5a5 !important;
+}
+
+.ytInlinePlayerControlsTopRightControlsCircleButton.yt-home-transcript-player-button[data-state="success"] button {
+  color: inherit !important;
+}
+
+.ytInlinePlayerControlsTopRightControlsCircleButton.yt-home-transcript-player-button[data-state="no_transcript"] button {
+  color: inherit !important;
+}
+
+.ytInlinePlayerControlsTopRightControlsCircleButton.yt-home-transcript-player-button[data-state="error"] button {
+  color: inherit !important;
 }
 
 /* 按钮样式 - 模仿 YouTube 原生操作按钮 */
@@ -398,11 +507,14 @@ ytd-watch-flexy[theater] .yt-transcript-extractor-btn {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .yt-home-transcript-player-button button,
+  .yt-home-transcript-player-button svg,
   .yt-transcript-extractor-btn,
   .yt-transcript-extractor-btn svg {
     transition: none !important;
   }
 
+  .yt-home-transcript-player-button button:disabled svg,
   .yt-transcript-extractor-btn:disabled svg {
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
