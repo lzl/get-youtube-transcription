@@ -98,6 +98,55 @@ test('createTranscriptWorkflow skips transcript panel fallback when allowPanelFa
   assert.equal(panelFallbackCalls, 0);
 });
 
+test('createTranscriptWorkflow capturePotToken uses the injected caption toggle finder', async () => {
+  let clickCount = 0;
+  let clickListener = null;
+  let listenerStarted = false;
+  const captionToggleButton = {
+    addEventListener(eventName, listener) {
+      if (eventName === 'click') {
+        clickListener = listener;
+      }
+    },
+    click() {
+      clickCount += 1;
+
+      if (!listenerStarted && clickListener) {
+        listenerStarted = true;
+        void clickListener();
+      }
+    },
+  };
+  const workflow = createTranscriptWorkflow({
+    TranscriptCore: require('../transcript-core.js'),
+    documentRef: {},
+    performanceRef: {
+      clearResourceTimings() {},
+      getEntriesByType(type) {
+        if (type !== 'resource' || clickCount < 2) {
+          return [];
+        }
+
+        return [
+          {
+            name: 'https://www.youtube.com/api/timedtext?v=video-123&pot=token-123',
+          },
+        ];
+      },
+    },
+    findCaptionToggleButton: () => captionToggleButton,
+    getVideoIdFromUrl: () => 'video-123',
+    navigatorRef: { clipboard: { writeText: async () => {} } },
+    resolvePageData: () => ({ title: 'Resolved Title' }),
+    waitForMilliseconds: async () => {},
+  });
+
+  const token = await workflow.capturePotToken('video-123');
+
+  assert.equal(token, 'token-123');
+  assert.equal(clickCount, 2);
+});
+
 test('createTranscriptWorkflow formats clipboard text as title, URL, blank line, body', () => {
   const workflow = createWorkflow();
 

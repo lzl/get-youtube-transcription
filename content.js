@@ -49,6 +49,13 @@ function getHomeHoverActionsApi() {
 const SUCCESS_BUTTON_FEEDBACK_MS = 1800;
 const ERROR_BUTTON_FEEDBACK_MS = 3000;
 const NO_TRANSCRIPT_ERROR_MESSAGE = 'No captions found';
+const WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS = [
+  '#movie_player button.ytp-subtitles-button',
+  '#movie_player .ytp-right-controls-left button.ytp-subtitles-button',
+];
+const HOME_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS = [
+  '.ytInlinePlayerControlsTopRightControls .ytmClosedCaptioningButtonButton',
+];
 
 class YoutubeTranscriptionExtension {
   static readTranscriptEntriesFromSegmentNodes(segmentNodes) {
@@ -93,6 +100,7 @@ class YoutubeTranscriptionExtension {
       getPageTitle: () => this.getPageTitle(),
       waitForMilliseconds: (milliseconds) => this.waitForMilliseconds(milliseconds),
       waitForSelector: (selector, timeout) => this.waitForSelector(selector, timeout),
+      findCaptionToggleButton: () => this.findCaptionToggleButton(),
       findTranscriptPanelButton: async () => this.findTranscriptPanelButton(),
       transcriptSegmentSelector: this.dom.TRANSCRIPT_SEGMENT_SELECTOR,
     });
@@ -237,6 +245,43 @@ class YoutubeTranscriptionExtension {
 
   findSuitableButtonContainer() {
     return this.dom.findSuitableButtonContainer(document);
+  }
+
+  findFirstVisibleElement(documentRef, selectors) {
+    for (const selector of selectors) {
+      const matches = Array.from(documentRef?.querySelectorAll?.(selector) || []);
+
+      for (const match of matches) {
+        if (this.isElementVisible(match)) {
+          return match;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  findLastVisibleElement(documentRef, selectors) {
+    let lastVisibleElement = null;
+
+    for (const selector of selectors) {
+      const matches = Array.from(documentRef?.querySelectorAll?.(selector) || []);
+
+      for (const match of matches) {
+        if (this.isElementVisible(match)) {
+          lastVisibleElement = match;
+        }
+      }
+    }
+
+    return lastVisibleElement;
+  }
+
+  findCaptionToggleButton(documentRef = document) {
+    return (
+      this.findFirstVisibleElement(documentRef, WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS) ||
+      this.findLastVisibleElement(documentRef, HOME_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS)
+    );
   }
 
   isValidWatchContainer(element) {

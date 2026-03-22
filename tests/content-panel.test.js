@@ -240,3 +240,26 @@ test('handlePageChange stops home hover controller and resumes watch button hand
 
   assert.deepEqual(calls, ['stop-home-hover', 'start-watch']);
 });
+
+test('findCaptionToggleButton returns the last visible homepage preview cc button', () => {
+  const hiddenPreviewButton = {
+    className: 'ytmClosedCaptioningButtonButton',
+  };
+  const visiblePreviewButton = {
+    className: 'ytmClosedCaptioningButtonButton',
+  };
+  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+  extension.isElementVisible = (element) => element === visiblePreviewButton;
+
+  const selectedButton = extension.findCaptionToggleButton({
+    querySelectorAll(selector) {
+      if (selector === '.ytInlinePlayerControlsTopRightControls .ytmClosedCaptioningButtonButton') {
+        return [hiddenPreviewButton, visiblePreviewButton];
+      }
+
+      return [];
+    },
+  });
+
+  assert.equal(selectedButton, visiblePreviewButton);
+});

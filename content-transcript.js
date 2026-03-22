@@ -49,6 +49,7 @@
       fetchImpl = typeof fetch === 'function' ? fetch.bind(globalRoot) : null,
       fetchTimedTextTranscript,
       fetchTranscriptFromPanel,
+      findCaptionToggleButton,
       findTranscriptPanelButton,
       getCurrentUrl = () => '',
       getPageTitle = () => 'Unknown Title',
@@ -98,7 +99,7 @@
         return potTokens.get(cacheKey);
       }
 
-      const subtitlesButton = documentRef?.querySelector(
+      const subtitlesButton = findCaptionToggleButton?.() || documentRef?.querySelector?.(
         '#movie_player button.ytp-subtitles-button, #movie_player .ytp-right-controls-left button.ytp-subtitles-button'
       );
 
