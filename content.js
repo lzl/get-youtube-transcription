@@ -34,6 +34,18 @@ function getTranscriptWorkflowApi() {
   return null;
 }
 
+function getHomeHoverActionsApi() {
+  if (typeof window !== 'undefined' && window.TranscriptHomeHoverActions) {
+    return window.TranscriptHomeHoverActions;
+  }
+
+  if (typeof require === 'function') {
+    return require('./content-hover-actions.js');
+  }
+
+  return null;
+}
+
 const SUCCESS_BUTTON_FEEDBACK_MS = 1800;
 const ERROR_BUTTON_FEEDBACK_MS = 3000;
 const NO_TRANSCRIPT_ERROR_MESSAGE = 'No captions found';
@@ -57,6 +69,7 @@ class YoutubeTranscriptionExtension {
     this.dom = getTranscriptDomApi();
     this.core = getTranscriptCoreApi();
     this.workflow = null;
+    this.homeHoverController = null;
 
     this.initializeExtension();
   }
@@ -84,9 +97,21 @@ class YoutubeTranscriptionExtension {
       transcriptSegmentSelector: this.dom.TRANSCRIPT_SEGMENT_SELECTOR,
     });
 
+    const homeHoverActionsApi = getHomeHoverActionsApi();
+
+    if (homeHoverActionsApi?.createHomeHoverUrlController) {
+      this.homeHoverController = homeHoverActionsApi.createHomeHoverUrlController({
+        documentRef: document,
+        windowRef: window,
+        consoleRef: console,
+        locationRef: window.location,
+        MutationObserverCtor: MutationObserver,
+      });
+    }
+
     this.setupGlobalDebugTool();
     this.observePageNavigation();
-    this.startObservingButtonContainer();
+    this.handlePageChange(window.location.href);
   }
 
   observePageNavigation() {
@@ -100,8 +125,12 @@ class YoutubeTranscriptionExtension {
       }
 
       lastUrl = currentUrl;
-      this.cleanupPreviousButton();
-      this.startObservingButtonContainer();
+
+      if (!this.isHomePage(currentUrl)) {
+        this.cleanupPreviousButton();
+      }
+
+      this.handlePageChange(currentUrl);
     };
 
     new MutationObserver(handleNavigationChange).observe(document, {
@@ -171,12 +200,34 @@ class YoutubeTranscriptionExtension {
     });
   }
 
-  isYoutubeVideoPage() {
-    return Boolean(this.getVideoId());
+  isYoutubeVideoPage(url = window.location.href) {
+    return Boolean(this.getVideoId(url));
   }
 
   getVideoId(url = window.location.href) {
     return this.core.getVideoIdFromUrl(url);
+  }
+
+  isHomePage(url = window.location.href) {
+    try {
+      return new URL(url).pathname === '/';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  handlePageChange(url = window.location.href) {
+    if (this.isHomePage(url)) {
+      this.cleanupPreviousButton();
+      this.homeHoverController?.start?.();
+      return;
+    }
+
+    this.homeHoverController?.stop?.();
+
+    if (this.isYoutubeVideoPage(url)) {
+      this.startObservingButtonContainer();
+    }
   }
 
   findSuitableButtonContainer() {
