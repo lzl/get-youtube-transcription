@@ -27,6 +27,18 @@
     return currentUrl;
   }
 
+  function resolveRunOptions(options, getCurrentUrl, getVideoIdFromUrl) {
+    const currentUrl = options?.currentUrl || getCurrentUrl();
+    const sourceUrl = options?.sourceUrl || getTranscriptSourceUrl(currentUrl, getVideoIdFromUrl);
+
+    return {
+      allowPanelFallback: options?.allowPanelFallback !== false,
+      currentUrl,
+      displayUrl: options?.displayUrl || currentUrl,
+      sourceUrl,
+    };
+  }
+
   function createTranscriptWorkflow(overrides = {}) {
     const {
       TranscriptCore,
@@ -206,8 +218,9 @@
       return readTranscriptEntriesFromSegmentNodes(documentRef.querySelectorAll(transcriptSegmentSelector));
     }
 
-    async function extractTranscriptPackage() {
-      const sourceUrl = getTranscriptSourceUrlImpl();
+    async function extractTranscriptPackage(options = {}) {
+      const runOptions = resolveRunOptions(options, getCurrentUrl, getVideoIdFromUrl);
+      const sourceUrl = runOptions.sourceUrl;
       const html = await fetchHtmlImpl(sourceUrl);
       const pageData = resolvePageData(html);
 
@@ -224,7 +237,7 @@
       const videoId = getVideoIdFromUrl(sourceUrl);
       let transcriptEntries = await fetchTimedTextTranscriptImpl(playerResponse, videoId);
 
-      if (!transcriptEntries.length) {
+      if (!transcriptEntries.length && runOptions.allowPanelFallback) {
         transcriptEntries = await fetchTranscriptFromPanelImpl();
       }
 
@@ -234,7 +247,7 @@
 
       return {
         title: pageData.title || getPageTitle(),
-        url: getCurrentUrl(),
+        url: runOptions.displayUrl,
         body: formatTranscriptText(transcriptEntries),
         entries: transcriptEntries,
       };

@@ -103,9 +103,14 @@ class YoutubeTranscriptionExtension {
       this.homeHoverController = homeHoverActionsApi.createHomeHoverUrlController({
         documentRef: document,
         windowRef: window,
-        consoleRef: console,
         locationRef: window.location,
         MutationObserverCtor: MutationObserver,
+        onTranscriptButtonClick: ({ buttonElement, watchUrl }) => {
+          void this.handleHomeHoverTranscriptButtonClick({
+            buttonElement,
+            watchUrl,
+          });
+        },
       });
     }
 
@@ -262,36 +267,108 @@ class YoutubeTranscriptionExtension {
     }
 
     const button = this.dom.createTranscriptButton(document, () => {
-      void this.handleTranscriptButtonClick();
+      void this.handleTranscriptButtonClick(button);
     });
 
     targetContainer.appendChild(button);
     this.transcriptButton = button;
   }
 
-  async handleTranscriptButtonClick() {
-    if (this.isExtracting) {
+  isMainActionTarget(button) {
+    return !button || button === this.transcriptButton;
+  }
+
+  getActionState(button) {
+    if (this.isMainActionTarget(button)) {
+      return {
+        isExtracting: this.isExtracting,
+        resetTimeout: this.buttonStateResetTimeout,
+      };
+    }
+
+    if (!button._ytTranscriptActionState) {
+      button._ytTranscriptActionState = {
+        isExtracting: false,
+        resetTimeout: null,
+      };
+    }
+
+    return button._ytTranscriptActionState;
+  }
+
+  setActionState(button, patch) {
+    if (this.isMainActionTarget(button)) {
+      if (Object.prototype.hasOwnProperty.call(patch, 'isExtracting')) {
+        this.isExtracting = patch.isExtracting;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(patch, 'resetTimeout')) {
+        this.buttonStateResetTimeout = patch.resetTimeout;
+      }
+
       return;
     }
 
-    this.clearButtonStateResetTimeout();
-    this.isExtracting = true;
-    this.updateButtonState('loading');
+    Object.assign(this.getActionState(button), patch);
+  }
+
+  async handleTranscriptButtonClick(button = null) {
+    return this.runTranscriptAction({
+      button,
+      updateState: (state) => this.updateButtonState(state),
+    });
+  }
+
+  async handleHomeHoverTranscriptButtonClick({ buttonElement, watchUrl }) {
+    return this.runTranscriptAction({
+      allowPanelFallback: false,
+      button: buttonElement,
+      displayUrl: watchUrl,
+      sourceUrl: watchUrl,
+      updateState: (state) => this.dom.updateHoverButtonState(buttonElement, state),
+    });
+  }
+
+  async runTranscriptAction({
+    allowPanelFallback,
+    button = null,
+    displayUrl,
+    sourceUrl,
+    updateState,
+  }) {
+    const actionState = this.getActionState(button);
+
+    if (actionState.isExtracting) {
+      return;
+    }
+
+    this.clearButtonStateResetTimeout(button);
+    this.setActionState(button, { isExtracting: true });
+    updateState('loading');
 
     try {
-      const transcriptPackage = await this.extractTranscriptPackage();
+      const transcriptPackage = await this.extractTranscriptPackage({
+        allowPanelFallback,
+        displayUrl,
+        sourceUrl,
+      });
       await this.copyTextToClipboard(transcriptPackage);
-      this.showTemporaryButtonState('success', SUCCESS_BUTTON_FEEDBACK_MS);
+      this.showTemporaryButtonState(button, updateState, 'success', SUCCESS_BUTTON_FEEDBACK_MS);
     } catch (error) {
       console.error('Transcript extraction failed:', error);
-      this.showTemporaryButtonState(this.getFeedbackStateForError(error), ERROR_BUTTON_FEEDBACK_MS);
+      this.showTemporaryButtonState(
+        button,
+        updateState,
+        this.getFeedbackStateForError(error),
+        ERROR_BUTTON_FEEDBACK_MS
+      );
     } finally {
-      this.isExtracting = false;
+      this.setActionState(button, { isExtracting: false });
     }
   }
 
-  async extractTranscriptPackage() {
-    return this.workflow.extractTranscriptPackage();
+  async extractTranscriptPackage(options = {}) {
+    return this.workflow.extractTranscriptPackage(options);
   }
 
   getTranscriptSourceUrl() {
@@ -343,24 +420,28 @@ class YoutubeTranscriptionExtension {
     this.dom.updateButtonState(this.transcriptButton, state);
   }
 
-  showTemporaryButtonState(state, duration) {
-    this.updateButtonState(state);
-    this.buttonStateResetTimeout = setTimeout(() => {
-      this.buttonStateResetTimeout = null;
+  showTemporaryButtonState(button, updateState, state, duration) {
+    updateState(state);
+    const timeout = setTimeout(() => {
+      this.setActionState(button, { resetTimeout: null });
 
-      if (!this.isExtracting) {
-        this.updateButtonState('normal');
+      if (!this.getActionState(button).isExtracting) {
+        updateState('normal');
       }
     }, duration);
+
+    this.setActionState(button, { resetTimeout: timeout });
   }
 
-  clearButtonStateResetTimeout() {
-    if (!this.buttonStateResetTimeout) {
+  clearButtonStateResetTimeout(button = null) {
+    const { resetTimeout } = this.getActionState(button);
+
+    if (!resetTimeout) {
       return;
     }
 
-    clearTimeout(this.buttonStateResetTimeout);
-    this.buttonStateResetTimeout = null;
+    clearTimeout(resetTimeout);
+    this.setActionState(button, { resetTimeout: null });
   }
 
   getFeedbackStateForError(error) {

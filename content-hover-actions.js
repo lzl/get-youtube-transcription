@@ -9,6 +9,19 @@
     root.TranscriptHomeHoverActions = api;
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  function getTranscriptDomApi() {
+    if (typeof globalThis !== 'undefined' && globalThis.TranscriptContentDom) {
+      return globalThis.TranscriptContentDom;
+    }
+
+    if (typeof require === 'function') {
+      return require('./content-dom.js');
+    }
+
+    return null;
+  }
+
+  const transcriptDomApi = getTranscriptDomApi();
   const HOME_CARD_SELECTOR = 'ytd-rich-grid-renderer ytd-rich-item-renderer';
   const WATCH_LINK_SELECTOR = 'a[href*="/watch"]';
   const HOVER_BUTTON_SELECTOR = 'ytd-thumbnail-overlay-toggle-button-renderer';
@@ -17,11 +30,12 @@
   const MODERN_PREVIEW_FALLBACK_SELECTOR = '.ytInlinePlayerControlsTopRightControls';
   const MODERN_PREVIEW_BUTTON_TEMPLATE_SELECTOR =
     '.ytInlinePlayerControlsTopRightControlsCircleButton';
-  const INJECTED_BUTTON_ATTR = 'data-yt-home-url-logger';
-  const MODERN_PLAYER_BUTTON_CLASS = 'yt-home-url-logger-player-button';
-  const BUTTON_LABEL = 'Log video URL';
-  const URL_LOG_ICON_PATH =
-    'M3.9 12a5 5 0 0 1 5-5h3v2h-3a3 3 0 1 0 0 6h3v2h-3a5 5 0 0 1-5-5Zm7-1h2v2h-2v-2Zm4.2-4h-3v2h3a3 3 0 1 1 0 6h-3v2h3a5 5 0 1 0 0-10Z';
+  const INJECTED_BUTTON_ATTR = 'data-yt-home-transcript-button';
+  const MODERN_PLAYER_BUTTON_CLASS = 'yt-home-transcript-player-button';
+  const BUTTON_LABEL = transcriptDomApi?.DEFAULT_BUTTON_TITLE || 'Get video transcript with one click';
+  const TRANSCRIPT_ICON_PATH =
+    transcriptDomApi?.TRANSCRIPT_ICON_PATH ||
+    'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
 
   function isHomePage(locationRef) {
     return locationRef?.pathname === '/';
@@ -101,7 +115,7 @@
     }
   }
 
-  function createLogButtonWrapper(templateWrapper, canonicalUrl, consoleRef) {
+  function createTranscriptButtonWrapper(templateWrapper, canonicalUrl, onTranscriptButtonClick) {
     const wrapper = templateWrapper?.cloneNode?.(true);
     const button = wrapper?.querySelector?.('button');
     const iconPath = wrapper?.querySelector?.('svg path');
@@ -123,12 +137,16 @@
     button.setAttribute?.('aria-label', BUTTON_LABEL);
     button.title = BUTTON_LABEL;
     button.ariaLabel = BUTTON_LABEL;
-    iconPath.setAttribute?.('d', URL_LOG_ICON_PATH);
+    iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
     updateTooltip(wrapper);
     button.addEventListener?.('click', (event) => {
       event?.preventDefault?.();
       event?.stopPropagation?.();
-      consoleRef?.log?.(canonicalUrl);
+      onTranscriptButtonClick?.({
+        buttonElement: button,
+        buttonKind: 'native',
+        watchUrl: canonicalUrl,
+      });
     });
 
     return wrapper;
@@ -142,7 +160,7 @@
     return documentRef?.createElement?.(tagName) || null;
   }
 
-  function createModernPlayerButton(documentRef, templateButton, getCurrentWatchUrl, consoleRef) {
+  function createModernPlayerButton(documentRef, templateButton, getCurrentWatchUrl, onTranscriptButtonClick) {
     if (templateButton?.cloneNode) {
       const wrapper = templateButton.cloneNode(true);
       const button = wrapper?.querySelector?.('button');
@@ -157,7 +175,7 @@
         button.setAttribute?.('aria-label', BUTTON_LABEL);
         button.title = BUTTON_LABEL;
         button.ariaLabel = BUTTON_LABEL;
-        iconPath.setAttribute?.('d', URL_LOG_ICON_PATH);
+        iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
         button.addEventListener?.('click', (event) => {
           event?.preventDefault?.();
           event?.stopPropagation?.();
@@ -167,7 +185,11 @@
             return;
           }
 
-          consoleRef?.log?.(currentWatchUrl);
+          onTranscriptButtonClick?.({
+            buttonElement: button,
+            buttonKind: 'modern',
+            watchUrl: currentWatchUrl,
+          });
         });
 
         return wrapper;
@@ -201,7 +223,7 @@
     button.ariaLabel = BUTTON_LABEL;
     icon.setAttribute?.('viewBox', '0 0 24 24');
     icon.setAttribute?.('aria-hidden', 'true');
-    path.setAttribute?.('d', URL_LOG_ICON_PATH);
+    path.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
     icon.appendChild?.(path);
     button.appendChild?.(icon);
     iconContainer.appendChild?.(button);
@@ -215,7 +237,11 @@
         return;
       }
 
-      consoleRef?.log?.(currentWatchUrl);
+      onTranscriptButtonClick?.({
+        buttonElement: button,
+        buttonKind: 'modern',
+        watchUrl: currentWatchUrl,
+      });
     });
 
     return wrapper;
@@ -281,9 +307,9 @@
   function createHomeHoverUrlController({
     documentRef,
     windowRef,
-    consoleRef,
     locationRef,
     MutationObserverCtor,
+    onTranscriptButtonClick,
     setTimeoutFn = typeof setTimeout === 'function' ? setTimeout : null,
     clearTimeoutFn = typeof clearTimeout === 'function' ? clearTimeout : null,
   }) {
@@ -385,7 +411,11 @@
           return;
         }
 
-        const injectedWrapper = createLogButtonWrapper(nativeButtons[0], canonicalUrl, consoleRef);
+        const injectedWrapper = createTranscriptButtonWrapper(
+          nativeButtons[0],
+          canonicalUrl,
+          onTranscriptButtonClick
+        );
 
         if (!injectedWrapper) {
           return;
@@ -407,12 +437,12 @@
         return;
       }
 
-      const modernButton = createModernPlayerButton(
-        documentRef,
-        findModernPreviewButtonTemplate(modernControlsContainer),
-        () => currentHoveredWatchUrl || canonicalUrl,
-        consoleRef
-      );
+        const modernButton = createModernPlayerButton(
+          documentRef,
+          findModernPreviewButtonTemplate(modernControlsContainer),
+          () => currentHoveredWatchUrl || canonicalUrl,
+          onTranscriptButtonClick
+        );
 
       if (!modernButton) {
         return;
@@ -467,7 +497,7 @@
     }
 
     return {
-      URL_LOG_ICON_PATH,
+      TRANSCRIPT_ICON_PATH,
       refresh,
       start,
       stop,
@@ -479,7 +509,7 @@
     HOME_CARD_SELECTOR,
     HOVER_BUTTON_SELECTOR,
     INJECTED_BUTTON_ATTR,
-    URL_LOG_ICON_PATH,
+    TRANSCRIPT_ICON_PATH,
     createHomeHoverUrlController,
   };
 });

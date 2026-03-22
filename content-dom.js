@@ -262,6 +262,26 @@
     animateButtonWidth(button, currentWidth, measureNaturalButtonWidth(button));
   }
 
+  function updateHoverButtonState(button, state) {
+    if (!button) {
+      return;
+    }
+
+    const resolvedState = BUTTON_STATES[state] ? state : 'normal';
+    const nextState = BUTTON_STATES[resolvedState];
+    const iconPath = button.querySelector?.('svg path');
+
+    button.disabled = nextState.disabled;
+    button.dataset.state = resolvedState;
+    button.title = nextState.title;
+    button.setAttribute?.('title', nextState.title);
+    button.setAttribute?.('aria-label', nextState.ariaLabel);
+
+    if (iconPath) {
+      iconPath.setAttribute?.('d', nextState.iconPath);
+    }
+  }
+
   function waitForMilliseconds(milliseconds) {
     return new Promise((resolve) => {
       setTimeout(resolve, milliseconds);
@@ -346,6 +366,8 @@
   }
 
   return {
+    DEFAULT_BUTTON_TITLE,
+    TRANSCRIPT_ICON_PATH,
     TRANSCRIPT_SEGMENT_SELECTOR,
     createTranscriptButton,
     expandVideoDescription,
@@ -356,6 +378,7 @@
     isElementVisible,
     isValidWatchContainer,
     readTranscriptEntriesFromSegmentNodes,
+    updateHoverButtonState,
     updateButtonState,
     waitForMilliseconds,
     waitForSelector,

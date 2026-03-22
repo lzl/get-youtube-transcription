@@ -214,6 +214,52 @@ function createStatefulButton() {
   return { button, label, status, path };
 }
 
+function createHoverStatefulButton() {
+  const path = {
+    d: 'initial',
+    setAttribute(name, value) {
+      if (name === 'd') {
+        this.d = value;
+      }
+    },
+    getAttribute(name) {
+      if (name === 'd') {
+        return this.d;
+      }
+
+      return null;
+    },
+  };
+  const attributes = {
+    title: 'Get video transcript with one click',
+    'aria-label': 'Get video transcript with one click',
+  };
+  const button = {
+    disabled: false,
+    dataset: {},
+    title: attributes.title,
+    setAttribute(name, value) {
+      attributes[name] = value;
+
+      if (name === 'title') {
+        this.title = value;
+      }
+    },
+    getAttribute(name) {
+      return attributes[name] || null;
+    },
+    querySelector(selector) {
+      if (selector === 'svg path') {
+        return path;
+      }
+
+      return null;
+    },
+  };
+
+  return { button, path };
+}
+
 test('content-dom updates success button state with accessible copy feedback', () => {
   const { button, label, status, path } = createStatefulButton();
 
@@ -238,6 +284,18 @@ test('content-dom updates loading button state and keeps it disabled', () => {
   assert.equal(label.textContent, 'Getting transcript...');
   assert.equal(status.textContent, 'Getting transcript...');
   assert.equal(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
+});
+
+test('content-dom updates hover button state without watch-button width animation', () => {
+  const { button, path } = createHoverStatefulButton();
+
+  dom.updateHoverButtonState(button, 'success');
+
+  assert.equal(button.dataset.state, 'success');
+  assert.equal(button.disabled, false);
+  assert.equal(button.title, 'Transcript copied to clipboard');
+  assert.equal(button.getAttribute('aria-label'), 'Transcript copied to clipboard');
+  assert.notEqual(path.getAttribute('d'), 'initial');
 });
 
 test('content-dom animates button width when desktop label length changes', () => {

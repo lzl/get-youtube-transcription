@@ -3,6 +3,9 @@ const assert = require('node:assert/strict');
 
 const { createHomeHoverUrlController } = require('../content-hover-actions.js');
 
+const TRANSCRIPT_BUTTON_TITLE = 'Get video transcript with one click';
+const TRANSCRIPT_ICON_PATH = 'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
+
 function createMockElement(tagName, options = {}) {
   const element = {
     tagName: String(tagName || '').toUpperCase(),
@@ -164,14 +167,14 @@ function matchesSelector(element, selector) {
     return element.tagName === 'YT-FORMATTED-STRING';
   }
 
-  if (selector === '[data-yt-home-url-logger="true"]') {
-    return element.getAttribute('data-yt-home-url-logger') === 'true';
+  if (selector === '[data-yt-home-transcript-button="true"]') {
+    return element.getAttribute('data-yt-home-transcript-button') === 'true';
   }
 
-  if (selector === '[data-yt-home-url-logger="true"].yt-home-url-logger-player-button') {
+  if (selector === '[data-yt-home-transcript-button="true"].yt-home-transcript-player-button') {
     return (
-      element.getAttribute('data-yt-home-url-logger') === 'true' &&
-      String(element.className).split(/\s+/).includes('yt-home-url-logger-player-button')
+      element.getAttribute('data-yt-home-transcript-button') === 'true' &&
+      String(element.className).split(/\s+/).includes('yt-home-transcript-player-button')
     );
   }
 
@@ -422,19 +425,17 @@ function createDocument(cards, options = {}) {
   };
 }
 
-test('home hover controller injects one native-looking button and logs canonical URL on click', () => {
+test('home hover controller injects one native-looking transcript button and reports the clicked watch URL', () => {
   const card = createCard({
     href: '/watch?v=abc123&pp=ygUPc29tZXRoaW5nLWVsc2U%3D',
   });
-  const loggedValues = [];
+  const clickPayloads = [];
   const controller = createHomeHoverUrlController({
     documentRef: createDocument([card]),
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
-    consoleRef: {
-      log(value) {
-        loggedValues.push(value);
-      },
+    onTranscriptButtonClick(payload) {
+      clickPayloads.push(payload);
     },
     MutationObserverCtor: class {
       observe() {}
@@ -444,33 +445,36 @@ test('home hover controller injects one native-looking button and logs canonical
 
   controller.refresh();
 
-  const insertedWrapper = card.querySelector('[data-yt-home-url-logger="true"]');
+  const insertedWrapper = card.querySelector('[data-yt-home-transcript-button="true"]');
   const insertedButton = insertedWrapper.querySelector('button');
 
   assert.ok(insertedWrapper);
-  assert.equal(insertedButton.title, 'Log video URL');
-  assert.equal(insertedButton.ariaLabel, 'Log video URL');
-  assert.equal(insertedWrapper.querySelector('svg path').getAttribute('d'), controller.URL_LOG_ICON_PATH);
+  assert.equal(insertedButton.title, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedButton.ariaLabel, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedWrapper.querySelector('svg path').getAttribute('d'), TRANSCRIPT_ICON_PATH);
 
   const clickEvent = createEvent();
   insertedButton.listeners.get('click')(clickEvent);
 
-  assert.deepEqual(loggedValues, ['https://www.youtube.com/watch?v=abc123']);
+  assert.equal(clickPayloads.length, 1);
+  assert.equal(clickPayloads[0].watchUrl, 'https://www.youtube.com/watch?v=abc123');
+  assert.equal(clickPayloads[0].buttonElement, insertedButton);
+  assert.equal(clickPayloads[0].buttonKind, 'native');
   assert.equal(clickEvent.defaultPrevented, true);
   assert.equal(clickEvent.propagationStopped, true);
 
   controller.refresh();
 
-  assert.equal(card.querySelectorAll('[data-yt-home-url-logger="true"]').length, 1);
+  assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
 });
 
-test('home hover controller injects the modern button into the inline preview top-right controls cluster', () => {
+test('home hover controller injects the modern transcript button into the inline preview top-right controls cluster', () => {
   const card = createCard({
     href: '/watch?v=modern123',
     modern: true,
     withButtons: false,
   });
-  const loggedValues = [];
+  const clickPayloads = [];
   const documentRef = createDocument([card], {
     withGlobalPreviewControls: true,
   });
@@ -478,10 +482,8 @@ test('home hover controller injects the modern button into the inline preview to
     documentRef,
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
-    consoleRef: {
-      log(value) {
-        loggedValues.push(value);
-      },
+    onTranscriptButtonClick(payload) {
+      clickPayloads.push(payload);
     },
     MutationObserverCtor: class {
       observe() {}
@@ -491,28 +493,31 @@ test('home hover controller injects the modern button into the inline preview to
 
   controller.refresh();
 
-  const insertedWrapper = documentRef.querySelector('[data-yt-home-url-logger="true"]');
+  const insertedWrapper = documentRef.querySelector('[data-yt-home-transcript-button="true"]');
   const insertedButton = insertedWrapper.querySelector('button');
 
   assert.ok(insertedWrapper);
   assert.equal(insertedWrapper.parentNode, documentRef.body.previewControls);
-  assert.equal(insertedButton?.title, 'Log video URL');
-  assert.equal(insertedButton?.ariaLabel, 'Log video URL');
-  assert.equal(insertedWrapper.querySelector('svg path').getAttribute('d'), controller.URL_LOG_ICON_PATH);
-  assert.match(insertedWrapper.className, /yt-home-url-logger-player-button/);
+  assert.equal(insertedButton?.title, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedButton?.ariaLabel, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedWrapper.querySelector('svg path').getAttribute('d'), TRANSCRIPT_ICON_PATH);
+  assert.match(insertedWrapper.className, /yt-home-transcript-player-button/);
 
   const clickEvent = createEvent();
   const enterHandler = card.listeners.get('mouseenter');
   enterHandler();
   insertedButton.listeners.get('click')(clickEvent);
 
-  assert.deepEqual(loggedValues, ['https://www.youtube.com/watch?v=modern123']);
+  assert.equal(clickPayloads.length, 1);
+  assert.equal(clickPayloads[0].watchUrl, 'https://www.youtube.com/watch?v=modern123');
+  assert.equal(clickPayloads[0].buttonElement, insertedButton);
+  assert.equal(clickPayloads[0].buttonKind, 'modern');
   assert.equal(clickEvent.defaultPrevented, true);
   assert.equal(clickEvent.propagationStopped, true);
 
   controller.refresh();
 
-  assert.equal(documentRef.querySelectorAll('[data-yt-home-url-logger="true"]').length, 1);
+  assert.equal(documentRef.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
 });
 
 test('home hover controller waits for modern preview controls instead of creating a standalone overlay', () => {
@@ -534,7 +539,7 @@ test('home hover controller waits for modern preview controls instead of creatin
 
   controller.refresh();
 
-  assert.equal(card.querySelectorAll('[data-yt-home-url-logger="true"]').length, 0);
+  assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
 });
 
 test('home hover controller keeps retrying until the active modern controls cluster gets the injected button', () => {
@@ -547,8 +552,8 @@ test('home hover controller keeps retrying until the active modern controls clus
   const documentRef = createDocument([card]);
   const stalePreviewControls = createModernPreviewControls();
   const staleInjectedButton = createMockElement('div', {
-    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-home-url-logger-player-button',
-    attributes: { 'data-yt-home-url-logger': 'true' },
+    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-home-transcript-player-button',
+    attributes: { 'data-yt-home-transcript-button': 'true' },
   });
 
   stalePreviewControls.topRightControls.appendChild(staleInjectedButton);
@@ -558,7 +563,7 @@ test('home hover controller keeps retrying until the active modern controls clus
     documentRef,
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
-    consoleRef: console,
+    onTranscriptButtonClick() {},
     MutationObserverCtor: class {
       observe() {}
       disconnect() {}
@@ -584,7 +589,7 @@ test('home hover controller keeps retrying until the active modern controls clus
   scheduledCallbacks.shift()();
 
   const injectedButtons = freshPreviewControls.topRightControls.querySelectorAll(
-    '[data-yt-home-url-logger="true"]'
+    '[data-yt-home-transcript-button="true"]'
   );
 
   assert.equal(injectedButtons.length, 1);
@@ -596,17 +601,15 @@ test('home hover controller retries modern preview injection when preview contro
     modern: true,
     withButtons: false,
   });
-  const loggedValues = [];
+  const clickPayloads = [];
   const scheduledCallbacks = [];
   const documentRef = createDocument([card]);
   const controller = createHomeHoverUrlController({
     documentRef,
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
-    consoleRef: {
-      log(value) {
-        loggedValues.push(value);
-      },
+    onTranscriptButtonClick(payload) {
+      clickPayloads.push(payload);
     },
     MutationObserverCtor: class {
       observe() {}
@@ -642,12 +645,12 @@ test('home hover controller retries modern preview injection when preview contro
   previewRoot.appendChild(mediaContainer);
   documentRef.body.appendChild(previewRoot);
 
-  assert.equal(documentRef.querySelectorAll('[data-yt-home-url-logger="true"]').length, 0);
+  assert.equal(documentRef.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
   assert.equal(scheduledCallbacks.length > 0, true);
 
   scheduledCallbacks.shift()();
 
-  const insertedWrapper = documentRef.querySelector('[data-yt-home-url-logger="true"]');
+  const insertedWrapper = documentRef.querySelector('[data-yt-home-transcript-button="true"]');
   const insertedButton = insertedWrapper.querySelector('button');
   assert.ok(insertedWrapper);
   assert.equal(insertedWrapper.parentNode, previewControls.topRightControls);
@@ -655,7 +658,10 @@ test('home hover controller retries modern preview injection when preview contro
   const clickEvent = createEvent();
   insertedButton.listeners.get('click')(clickEvent);
 
-  assert.deepEqual(loggedValues, ['https://www.youtube.com/watch?v=modern789']);
+  assert.equal(clickPayloads.length, 1);
+  assert.equal(clickPayloads[0].watchUrl, 'https://www.youtube.com/watch?v=modern789');
+  assert.equal(clickPayloads[0].buttonElement, insertedButton);
+  assert.equal(clickPayloads[0].buttonKind, 'modern');
   assert.equal(clickEvent.defaultPrevented, true);
   assert.equal(clickEvent.propagationStopped, true);
 });
@@ -669,7 +675,7 @@ test('home hover controller skips non-home pages and cards without a valid watch
     documentRef: createDocument(cards),
     locationRef: { pathname: '/watch' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
-    consoleRef: console,
+    onTranscriptButtonClick() {},
     MutationObserverCtor: class {
       observe() {}
       disconnect() {}
@@ -690,7 +696,7 @@ test('home hover controller starts and stops its observer around refreshes', () 
     documentRef: createDocument([card]),
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
-    consoleRef: console,
+    onTranscriptButtonClick() {},
     MutationObserverCtor: class {
       constructor(callback) {
         this.callback = callback;
@@ -708,7 +714,7 @@ test('home hover controller starts and stops its observer around refreshes', () 
 
   controller.start();
 
-  assert.equal(card.querySelectorAll('[data-yt-home-url-logger="true"]').length, 1);
+  assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
   assert.equal(observeCalls.length, 1);
 
   controller.stop();
