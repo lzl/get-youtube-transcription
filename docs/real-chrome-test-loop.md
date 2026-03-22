@@ -20,6 +20,7 @@ Before starting, confirm:
 
 1. Chrome is already running.
 2. Chrome has remote debugging enabled.
+   In Chrome, open `chrome://inspect/#remote-debugging` and enable `Allow remote debugging for this browser instance`.
 3. The extension is loaded unpacked in that Chrome profile.
 4. `browser-use` is available in the local environment.
 
