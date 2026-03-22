@@ -3,6 +3,27 @@
   --yt-transcript-ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.yt-home-url-logger-player-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: top;
+}
+
+.yt-home-url-logger-player-button button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.yt-home-url-logger-player-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  pointer-events: none;
+}
+
 /* 按钮样式 - 模仿 YouTube 原生操作按钮 */
 .yt-transcript-extractor-btn {
   display: inline-flex;
