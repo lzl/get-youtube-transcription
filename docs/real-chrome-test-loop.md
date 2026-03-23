@@ -66,13 +66,21 @@ Reload the unpacked extension by clicking its `Reload` button through shadow DOM
 
 ```bash
 browser-use --session real eval '(() => {
-  const item = document.querySelector("extensions-manager")
+  const itemList = document.querySelector("extensions-manager")
     ?.shadowRoot?.querySelector("extensions-item-list")
-    ?.shadowRoot?.querySelector("extensions-item#pnflehbnpmgkbkmpenacocncmccnifke");
+    ?.shadowRoot;
+  const item = Array.from(itemList?.querySelectorAll("extensions-item") || []).find((candidate) => {
+    const name = candidate.shadowRoot?.querySelector("#name")?.textContent?.trim()?.toLowerCase() || "";
+    return name.includes("get youtube transcription");
+  });
   const reloadButton = item?.shadowRoot?.querySelector("#dev-reload-button");
   if (!reloadButton) return { clicked: false };
   reloadButton.click();
-  return { clicked: true, aria: reloadButton.getAttribute("aria-label") };
+  return {
+    clicked: true,
+    aria: reloadButton.getAttribute("aria-label"),
+    name: item?.shadowRoot?.querySelector("#name")?.textContent?.trim() || null,
+  };
 })()'
 ```
 
@@ -138,7 +146,7 @@ result = browser._run(page.evaluate("""() => {
     children: controls
       ? Array.from(controls.children).map((el) => ({
           cls: el.className || null,
-          injected: el.getAttribute("data-yt-home-url-logger"),
+          injected: el.getAttribute("data-yt-home-transcript-button"),
           title: el.querySelector("button")?.getAttribute("title"),
           aria: el.querySelector("button")?.getAttribute("aria-label"),
         }))
@@ -153,8 +161,8 @@ Expected success signal:
 
 - `hasControls: true`
 - `childCount: 3`
-- one child with `data-yt-home-url-logger="true"`
-- that child's button title should be `Log video URL`
+- one child with `data-yt-home-transcript-button="true"`
+- that child's button title should be `Copy transcript`
 
 ### 5. Capture a screenshot in the same hover session
 
@@ -233,7 +241,7 @@ Reloaded extension in chrome://extensions/.
 Reloaded the YouTube homepage in the real Chrome tab.
 Hover controls appeared.
 .ytInlinePlayerControlsTopRightControls child count: 3.
-Injected node present with title "Log video URL".
+Injected node present with title "Copy transcript".
 Screenshot: /absolute/path/to/.tmp-real-hover-check.png
 ```
 
@@ -256,7 +264,7 @@ For quick reuse, this is the minimal practical sequence:
 ```bash
 browser-use --session real python 'tabs = browser._run(browser._session.get_tabs()); print([(i, tab.url, tab.title) for i, tab in enumerate(tabs)])'
 browser-use --session real switch <extensions-tab-index>
-browser-use --session real eval '(() => { const item = document.querySelector("extensions-manager")?.shadowRoot?.querySelector("extensions-item-list")?.shadowRoot?.querySelector("extensions-item#pnflehbnpmgkbkmpenacocncmccnifke"); const reloadButton = item?.shadowRoot?.querySelector("#dev-reload-button"); if (!reloadButton) return { clicked: false }; reloadButton.click(); return { clicked: true }; })()'
+browser-use --session real eval '(() => { const itemList = document.querySelector("extensions-manager")?.shadowRoot?.querySelector("extensions-item-list")?.shadowRoot; const item = Array.from(itemList?.querySelectorAll("extensions-item") || []).find((candidate) => { const name = candidate.shadowRoot?.querySelector("#name")?.textContent?.trim()?.toLowerCase() || ""; return name.includes("get youtube transcription"); }); const reloadButton = item?.shadowRoot?.querySelector("#dev-reload-button"); if (!reloadButton) return { clicked: false }; reloadButton.click(); return { clicked: true, name: item?.shadowRoot?.querySelector("#name")?.textContent?.trim() || null }; })()'
 browser-use --session real switch <youtube-tab-index>
 browser-use --session real eval 'location.reload(); "reloading"'
 sleep 2
@@ -271,7 +279,7 @@ result = browser._run(page.evaluate("""() => {
     hasControls: Boolean(controls),
     childCount: controls ? controls.children.length : 0,
     children: controls ? Array.from(controls.children).map((el) => ({
-      injected: el.getAttribute("data-yt-home-url-logger"),
+      injected: el.getAttribute("data-yt-home-transcript-button"),
       title: el.querySelector("button")?.getAttribute("title"),
     })) : [],
   };
