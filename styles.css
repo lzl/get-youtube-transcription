@@ -9,10 +9,11 @@
   justify-content: center;
   vertical-align: top;
   border-radius: 999px;
+  box-shadow: none;
+  cursor: pointer;
   transition:
     box-shadow 0.16s var(--yt-transcript-ease-out-quint),
-    color 0.16s var(--yt-transcript-ease-out-quint),
-    opacity 0.16s var(--yt-transcript-ease-out-quint);
+    color 0.16s var(--yt-transcript-ease-out-quint);
 }
 
 .yt-home-transcript-player-button button {
@@ -24,40 +25,29 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(15, 15, 15, 0.26) !important;
-  color: rgba(255, 255, 255, 0.96) !important;
+  background: transparent;
+  color: #ffffff;
   cursor: pointer;
   transition:
     background-color 0.16s var(--yt-transcript-ease-out-quint),
     color 0.16s var(--yt-transcript-ease-out-quint),
     box-shadow 0.16s var(--yt-transcript-ease-out-quint),
     transform 0.16s var(--yt-transcript-ease-out-quint);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 6px 18px rgba(0, 0, 0, 0.22) !important;
+  box-shadow: none;
 }
 
 .yt-home-transcript-player-button button:hover {
-  background: rgba(15, 15, 15, 0.42) !important;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
-    0 8px 20px rgba(0, 0, 0, 0.24) !important;
-  transform: translateY(-1px) scale(1.03);
+  background: transparent;
 }
 
 .yt-home-transcript-player-button button:focus-visible {
   outline: none;
-  background: rgba(15, 15, 15, 0.46) !important;
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.94),
-    0 0 0 4px rgba(15, 15, 15, 0.42),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.32) !important;
-  transform: translateY(-1px) scale(1.02);
+  background: transparent;
+  box-shadow: none;
 }
 
 .yt-home-transcript-player-button button:active {
-  background: rgba(15, 15, 15, 0.5) !important;
-  transform: scale(0.97);
+  background: transparent;
 }
 
 .yt-home-transcript-player-button svg {
@@ -65,88 +55,50 @@
   height: 20px;
   fill: currentColor;
   pointer-events: none;
-  opacity: 0.98;
   transition:
     transform 0.16s var(--yt-transcript-ease-out-quint),
     opacity 0.16s var(--yt-transcript-ease-out-quint);
 }
 
-.yt-home-transcript-player-button[data-state="loading"] button,
-.yt-home-transcript-player-button button[data-state="loading"] {
-  background: rgba(15, 15, 15, 0.38) !important;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-    0 6px 18px rgba(0, 0, 0, 0.18) !important;
-}
-
-.yt-home-transcript-player-button[data-state="success"] {
-  box-shadow: inset 0 0 0 1px #bbf7d0;
-  color: #bbf7d0;
-}
-
-.yt-home-transcript-player-button[data-state="success"] button,
 .yt-home-transcript-player-button button[data-state="success"] {
-  background: rgba(21, 128, 61, 0.38) !important;
-  color: #bbf7d0 !important;
-  box-shadow:
-    inset 0 0 0 1px rgba(187, 247, 208, 0.34),
-    0 8px 18px rgba(0, 0, 0, 0.2) !important;
+  background: transparent;
+  color: #86efac;
 }
 
-.yt-home-transcript-player-button[data-state="success"] svg,
 .yt-home-transcript-player-button button[data-state="success"] svg {
-  transform: scale(0.92);
-  animation: yt-home-transcript-confirm 180ms var(--yt-transcript-ease-out-quint);
+  transform: none;
 }
 
-.yt-home-transcript-player-button[data-state="no_transcript"] {
-  box-shadow: inset 0 0 0 1px #fde68a;
-  color: #fde68a;
+.yt-home-transcript-player-button button[data-state="success"]:hover {
+  background: transparent;
 }
 
-.yt-home-transcript-player-button[data-state="no_transcript"] button,
 .yt-home-transcript-player-button button[data-state="no_transcript"] {
-  background: rgba(180, 83, 9, 0.34) !important;
-  color: #fde68a !important;
-  box-shadow:
-    inset 0 0 0 1px rgba(253, 230, 138, 0.34),
-    0 8px 18px rgba(0, 0, 0, 0.18) !important;
+  background: transparent;
+  color: #fcd34d;
 }
 
-.yt-home-transcript-player-button[data-state="error"] {
-  box-shadow: inset 0 0 0 1px #fecaca;
-  color: #fecaca;
+.yt-home-transcript-player-button button[data-state="no_transcript"]:hover {
+  background: transparent;
 }
 
-.yt-home-transcript-player-button[data-state="error"] button,
 .yt-home-transcript-player-button button[data-state="error"] {
-  background: rgba(185, 28, 28, 0.34) !important;
-  color: #fecaca !important;
-  box-shadow:
-    inset 0 0 0 1px rgba(254, 202, 202, 0.34),
-    0 8px 18px rgba(0, 0, 0, 0.18) !important;
+  background: transparent;
+  color: #fca5a5;
+}
+
+.yt-home-transcript-player-button button[data-state="error"]:hover {
+  background: transparent;
 }
 
 .yt-home-transcript-player-button button:disabled {
-  opacity: 0.92;
+  opacity: 1;
   cursor: progress;
   pointer-events: none;
 }
 
 .yt-home-transcript-player-button button:disabled svg {
   animation: spin 1s linear infinite;
-}
-
-@keyframes yt-home-transcript-confirm {
-  0% {
-    transform: scale(0.86);
-    opacity: 0.86;
-  }
-
-  100% {
-    transform: scale(0.92);
-    opacity: 1;
-  }
 }
 
 /* 按钮样式 - 模仿 YouTube 原生操作按钮 */

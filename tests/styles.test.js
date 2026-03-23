@@ -5,24 +5,24 @@ const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '..');
 
-test('homepage preview transcript button defines calm hover, focus, and loading affordances', () => {
+test('homepage preview transcript button keeps the native transparent feel and full-button interactivity', () => {
   const css = fs.readFileSync(path.join(repoRoot, 'styles.css'), 'utf8');
 
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\s*\{[\s\S]*background:\s*rgba\([^)]+\)[\s\S]*color:\s*rgba\([^)]+\)[\s\S]*transition:[\s\S]*transform/i
+    /\.yt-home-transcript-player-button button\s*\{[\s\S]*width:\s*100%[\s\S]*height:\s*100%[\s\S]*background:\s*transparent[\s\S]*color:\s*#(?:fff|ffffff)/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button:hover[\s\S]*transform:\s*translateY\(-1px\)\s*scale\(1\.0[23]\)/i
+    /\.yt-home-transcript-player-button button:hover\s*\{[\s\S]*background:\s*transparent/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button:focus-visible[\s\S]*box-shadow:[\s\S]*0 0 0 2px/i
+    /\.yt-home-transcript-player-button button:active\s*\{[\s\S]*background:\s*transparent/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button:active[\s\S]*transform:\s*scale\(0\.9[67]\)/i
+    /\.yt-home-transcript-player-button button:focus-visible[\s\S]*outline:\s*none/i
   );
   assert.match(
     css,
@@ -35,27 +35,23 @@ test('homepage preview transcript button defines success, no_transcript, and err
 
   assert.match(
     css,
-    /\.yt-home-transcript-player-button\[data-state="success"\][\s\S]*button[\s\S]*color:\s*#bbf7d0/i
+    /\.yt-home-transcript-player-button button\[data-state="success"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#86efac/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button\[data-state="success"\][\s\S]*box-shadow:[\s\S]*#bbf7d0/i
+    /\.yt-home-transcript-player-button button\[data-state="success"\] svg\s*\{[\s\S]*transform:\s*none/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button\[data-state="no_transcript"\][\s\S]*button[\s\S]*color:\s*#fde68a/i
+    /\.yt-home-transcript-player-button button\[data-state="no_transcript"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#fcd34d/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button\[data-state="no_transcript"\][\s\S]*box-shadow:[\s\S]*#fde68a/i
+    /\.yt-home-transcript-player-button button\[data-state="error"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#fca5a5/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button\[data-state="error"\][\s\S]*button[\s\S]*color:\s*#fecaca/i
-  );
-  assert.match(
-    css,
-    /\.yt-home-transcript-player-button\[data-state="error"\][\s\S]*box-shadow:[\s\S]*#fecaca/i
+    /\.yt-home-transcript-player-button\s+button\[data-state=\"success\"\]:hover[\s\S]*background:\s*transparent/i
   );
   assert.match(
     css,

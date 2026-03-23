@@ -466,6 +466,16 @@ test('home hover controller injects one native-looking transcript button and rep
   assert.equal(clickEvent.defaultPrevented, true);
   assert.equal(clickEvent.propagationStopped, true);
 
+  const wrapperClickEvent = createEvent();
+  insertedWrapper.listeners.get('click')(wrapperClickEvent);
+
+  assert.equal(clickPayloads.length, 2);
+  assert.equal(clickPayloads[1].watchUrl, 'https://www.youtube.com/watch?v=abc123');
+  assert.equal(clickPayloads[1].buttonElement, insertedButton);
+  assert.equal(clickPayloads[1].buttonKind, 'native');
+  assert.equal(wrapperClickEvent.defaultPrevented, true);
+  assert.equal(wrapperClickEvent.propagationStopped, true);
+
   controller.refresh();
 
   assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
@@ -519,6 +529,16 @@ test('home hover controller injects the modern transcript button into the inline
   assert.equal(clickPayloads[0].buttonKind, 'modern');
   assert.equal(clickEvent.defaultPrevented, true);
   assert.equal(clickEvent.propagationStopped, true);
+
+  const wrapperClickEvent = createEvent();
+  insertedWrapper.listeners.get('click')(wrapperClickEvent);
+
+  assert.equal(clickPayloads.length, 2);
+  assert.equal(clickPayloads[1].watchUrl, 'https://www.youtube.com/watch?v=modern123');
+  assert.equal(clickPayloads[1].buttonElement, insertedButton);
+  assert.equal(clickPayloads[1].buttonKind, 'modern');
+  assert.equal(wrapperClickEvent.defaultPrevented, true);
+  assert.equal(wrapperClickEvent.propagationStopped, true);
 
   controller.refresh();
 

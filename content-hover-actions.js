@@ -129,6 +129,21 @@
     updateTooltip(wrapper, HOME_HOVER_BUTTON_LABEL);
   }
 
+  function handleHomeHoverButtonClick(event, button, buttonKind, watchUrl, onTranscriptButtonClick) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (!watchUrl) {
+      return;
+    }
+
+    onTranscriptButtonClick?.({
+      buttonElement: button,
+      buttonKind,
+      watchUrl,
+    });
+  }
+
   function createTranscriptButtonWrapper(templateWrapper, canonicalUrl, onTranscriptButtonClick) {
     const wrapper = templateWrapper?.cloneNode?.(true);
     const button = wrapper?.querySelector?.('button');
@@ -151,13 +166,10 @@
     configureHomeHoverButton(button, wrapper);
     iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
     button.addEventListener?.('click', (event) => {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      onTranscriptButtonClick?.({
-        buttonElement: button,
-        buttonKind: 'native',
-        watchUrl: canonicalUrl,
-      });
+      handleHomeHoverButtonClick(event, button, 'native', canonicalUrl, onTranscriptButtonClick);
+    });
+    wrapper.addEventListener?.('click', (event) => {
+      handleHomeHoverButtonClick(event, button, 'native', canonicalUrl, onTranscriptButtonClick);
     });
 
     return wrapper;
@@ -185,19 +197,22 @@
         configureHomeHoverButton(button, wrapper);
         iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
         button.addEventListener?.('click', (event) => {
-          event?.preventDefault?.();
-          event?.stopPropagation?.();
-          const currentWatchUrl = getCurrentWatchUrl?.();
-
-          if (!currentWatchUrl) {
-            return;
-          }
-
-          onTranscriptButtonClick?.({
-            buttonElement: button,
-            buttonKind: 'modern',
-            watchUrl: currentWatchUrl,
-          });
+          handleHomeHoverButtonClick(
+            event,
+            button,
+            'modern',
+            getCurrentWatchUrl?.(),
+            onTranscriptButtonClick
+          );
+        });
+        wrapper.addEventListener?.('click', (event) => {
+          handleHomeHoverButtonClick(
+            event,
+            button,
+            'modern',
+            getCurrentWatchUrl?.(),
+            onTranscriptButtonClick
+          );
         });
 
         return wrapper;
@@ -234,19 +249,10 @@
     iconContainer.appendChild?.(button);
     wrapper.appendChild?.(iconContainer);
     button.addEventListener?.('click', (event) => {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      const currentWatchUrl = getCurrentWatchUrl?.();
-
-      if (!currentWatchUrl) {
-        return;
-      }
-
-      onTranscriptButtonClick?.({
-        buttonElement: button,
-        buttonKind: 'modern',
-        watchUrl: currentWatchUrl,
-      });
+      handleHomeHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
+    });
+    wrapper.addEventListener?.('click', (event) => {
+      handleHomeHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
     });
 
     return wrapper;
