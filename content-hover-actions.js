@@ -32,7 +32,7 @@
     '.ytInlinePlayerControlsTopRightControlsCircleButton';
   const INJECTED_BUTTON_ATTR = 'data-yt-home-transcript-button';
   const MODERN_PLAYER_BUTTON_CLASS = 'yt-home-transcript-player-button';
-  const BUTTON_LABEL = transcriptDomApi?.DEFAULT_BUTTON_TITLE || 'Get video transcript with one click';
+  const HOME_HOVER_BUTTON_LABEL = 'Copy transcript';
   const TRANSCRIPT_ICON_PATH =
     transcriptDomApi?.TRANSCRIPT_ICON_PATH ||
     'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
@@ -104,15 +104,29 @@
     });
   }
 
-  function updateTooltip(wrapper) {
+  function updateTooltip(wrapper, text = HOME_HOVER_BUTTON_LABEL) {
     const tooltip =
       wrapper?.querySelector?.('#tooltip, tp-yt-paper-tooltip #tooltip, yt-formatted-string') ||
       wrapper?.querySelector?.('#tooltip') ||
       wrapper?.querySelector?.('yt-formatted-string');
 
     if (tooltip) {
-      tooltip.textContent = BUTTON_LABEL;
+      tooltip.textContent = text;
     }
+  }
+
+  function configureHomeHoverButton(button, wrapper) {
+    if (!button) {
+      return;
+    }
+
+    button._ytTranscriptNormalTitle = HOME_HOVER_BUTTON_LABEL;
+    button._ytTranscriptNormalAriaLabel = HOME_HOVER_BUTTON_LABEL;
+    button.setAttribute?.('title', HOME_HOVER_BUTTON_LABEL);
+    button.setAttribute?.('aria-label', HOME_HOVER_BUTTON_LABEL);
+    button.title = HOME_HOVER_BUTTON_LABEL;
+    button.ariaLabel = HOME_HOVER_BUTTON_LABEL;
+    updateTooltip(wrapper, HOME_HOVER_BUTTON_LABEL);
   }
 
   function createTranscriptButtonWrapper(templateWrapper, canonicalUrl, onTranscriptButtonClick) {
@@ -125,6 +139,7 @@
     }
 
     wrapper.setAttribute?.(INJECTED_BUTTON_ATTR, 'true');
+    wrapper.className = `${wrapper.className || ''} ${MODERN_PLAYER_BUTTON_CLASS}`.trim();
     wrapper.removeAttribute?.('command');
     wrapper.removeAttribute?.('command-target');
     wrapper.removeAttribute?.('target-id');
@@ -133,12 +148,8 @@
     button.removeAttribute?.('target-id');
     button.removeAttribute?.('href');
     button.type = 'button';
-    button.setAttribute?.('title', BUTTON_LABEL);
-    button.setAttribute?.('aria-label', BUTTON_LABEL);
-    button.title = BUTTON_LABEL;
-    button.ariaLabel = BUTTON_LABEL;
+    configureHomeHoverButton(button, wrapper);
     iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
-    updateTooltip(wrapper);
     button.addEventListener?.('click', (event) => {
       event?.preventDefault?.();
       event?.stopPropagation?.();
@@ -171,10 +182,7 @@
         wrapper.className = `${wrapper.className || ''} ${MODERN_PLAYER_BUTTON_CLASS}`.trim();
         button.removeAttribute?.('aria-pressed');
         button.type = 'button';
-        button.setAttribute?.('title', BUTTON_LABEL);
-        button.setAttribute?.('aria-label', BUTTON_LABEL);
-        button.title = BUTTON_LABEL;
-        button.ariaLabel = BUTTON_LABEL;
+        configureHomeHoverButton(button, wrapper);
         iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
         button.addEventListener?.('click', (event) => {
           event?.preventDefault?.();
@@ -217,10 +225,7 @@
     iconContainer.className = 'ytInlinePlayerControlsButtonIcon';
     button.className = 'ytmMuteButtonButton';
     button.type = 'button';
-    button.setAttribute?.('title', BUTTON_LABEL);
-    button.setAttribute?.('aria-label', BUTTON_LABEL);
-    button.title = BUTTON_LABEL;
-    button.ariaLabel = BUTTON_LABEL;
+    configureHomeHoverButton(button, wrapper);
     icon.setAttribute?.('viewBox', '0 0 24 24');
     icon.setAttribute?.('aria-hidden', 'true');
     path.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
@@ -505,7 +510,7 @@
   }
 
   return {
-    BUTTON_LABEL,
+    BUTTON_LABEL: HOME_HOVER_BUTTON_LABEL,
     HOME_CARD_SELECTOR,
     HOVER_BUTTON_SELECTOR,
     INJECTED_BUTTON_ATTR,

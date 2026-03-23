@@ -90,21 +90,6 @@
     },
   };
 
-  const HOVER_WRAPPER_STATE_STYLES = {
-    success: {
-      boxShadow: 'inset 0 0 0 1px #86efac',
-      color: '#86efac',
-    },
-    no_transcript: {
-      boxShadow: 'inset 0 0 0 1px #fcd34d',
-      color: '#fcd34d',
-    },
-    error: {
-      boxShadow: 'inset 0 0 0 1px #fca5a5',
-      color: '#fca5a5',
-    },
-  };
-
   function extractModernTranscriptFallbackText(segmentNode, timestamp) {
     let text = (segmentNode.textContent || '').trim();
     const accessibilityLabel = segmentNode.querySelector('.ytwTranscriptSegmentViewModelTimestampA11yLabel')
@@ -314,19 +299,30 @@
     const nextState = BUTTON_STATES[resolvedState];
     const iconPath = button.querySelector?.('svg path');
     const wrapper = findAncestorByClassName(button, 'yt-home-transcript-player-button');
+    const nextTitle =
+      resolvedState === 'normal' ? button._ytTranscriptNormalTitle || nextState.title : nextState.title;
+    const nextAriaLabel =
+      resolvedState === 'normal'
+        ? button._ytTranscriptNormalAriaLabel || nextState.ariaLabel
+        : nextState.ariaLabel;
 
     button.disabled = nextState.disabled;
     button.dataset.state = resolvedState;
     if (wrapper?.dataset) {
       wrapper.dataset.state = resolvedState;
     }
-    if (wrapper?.style) {
-      wrapper.style.boxShadow = HOVER_WRAPPER_STATE_STYLES[resolvedState]?.boxShadow || '';
-      wrapper.style.color = HOVER_WRAPPER_STATE_STYLES[resolvedState]?.color || '';
+    button.title = nextTitle;
+    button.setAttribute?.('title', nextTitle);
+    button.setAttribute?.('aria-label', nextAriaLabel);
+
+    const tooltip =
+      wrapper?.querySelector?.('#tooltip, tp-yt-paper-tooltip #tooltip, yt-formatted-string') ||
+      wrapper?.querySelector?.('#tooltip') ||
+      wrapper?.querySelector?.('yt-formatted-string');
+
+    if (tooltip) {
+      tooltip.textContent = nextTitle;
     }
-    button.title = nextState.title;
-    button.setAttribute?.('title', nextState.title);
-    button.setAttribute?.('aria-label', nextState.ariaLabel);
 
     if (iconPath) {
       iconPath.setAttribute?.('d', nextState.iconPath);

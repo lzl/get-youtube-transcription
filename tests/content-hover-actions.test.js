@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const { createHomeHoverUrlController } = require('../content-hover-actions.js');
 
-const TRANSCRIPT_BUTTON_TITLE = 'Get video transcript with one click';
+const TRANSCRIPT_BUTTON_TITLE = 'Copy transcript';
 const TRANSCRIPT_ICON_PATH = 'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
 
 function createMockElement(tagName, options = {}) {
@@ -449,8 +449,11 @@ test('home hover controller injects one native-looking transcript button and rep
   const insertedButton = insertedWrapper.querySelector('button');
 
   assert.ok(insertedWrapper);
+  assert.match(insertedWrapper.className, /yt-home-transcript-player-button/);
   assert.equal(insertedButton.title, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedButton.ariaLabel, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedButton._ytTranscriptNormalTitle, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedButton._ytTranscriptNormalAriaLabel, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedWrapper.querySelector('svg path').getAttribute('d'), TRANSCRIPT_ICON_PATH);
 
   const clickEvent = createEvent();
@@ -500,6 +503,8 @@ test('home hover controller injects the modern transcript button into the inline
   assert.equal(insertedWrapper.parentNode, documentRef.body.previewControls);
   assert.equal(insertedButton?.title, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedButton?.ariaLabel, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedButton?._ytTranscriptNormalTitle, TRANSCRIPT_BUTTON_TITLE);
+  assert.equal(insertedButton?._ytTranscriptNormalAriaLabel, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedWrapper.querySelector('svg path').getAttribute('d'), TRANSCRIPT_ICON_PATH);
   assert.match(insertedWrapper.className, /yt-home-transcript-player-button/);
 

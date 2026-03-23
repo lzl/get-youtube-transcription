@@ -5,12 +5,24 @@ const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '..');
 
-test('homepage preview transcript button uses white icons and loading spinner styles', () => {
+test('homepage preview transcript button defines calm hover, focus, and loading affordances', () => {
   const css = fs.readFileSync(path.join(repoRoot, 'styles.css'), 'utf8');
 
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#(?:fff|ffffff)\s*;/i
+    /\.yt-home-transcript-player-button button\s*\{[\s\S]*background:\s*rgba\([^)]+\)[\s\S]*color:\s*rgba\([^)]+\)[\s\S]*transition:[\s\S]*transform/i
+  );
+  assert.match(
+    css,
+    /\.yt-home-transcript-player-button button:hover[\s\S]*transform:\s*translateY\(-1px\)\s*scale\(1\.0[23]\)/i
+  );
+  assert.match(
+    css,
+    /\.yt-home-transcript-player-button button:focus-visible[\s\S]*box-shadow:[\s\S]*0 0 0 2px/i
+  );
+  assert.match(
+    css,
+    /\.yt-home-transcript-player-button button:active[\s\S]*transform:\s*scale\(0\.9[67]\)/i
   );
   assert.match(
     css,
@@ -23,26 +35,30 @@ test('homepage preview transcript button defines success, no_transcript, and err
 
   assert.match(
     css,
-    /\.ytInlinePlayerControlsTopRightControlsCircleButton\.yt-home-transcript-player-button\[data-state="success"\]\s*\{[\s\S]*box-shadow:\s*inset 0 0 0 1px #86efac !important\s*;/i
+    /\.yt-home-transcript-player-button\[data-state="success"\][\s\S]*button[\s\S]*color:\s*#bbf7d0/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\[data-state="success"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#86efac\s*;/i
+    /\.yt-home-transcript-player-button\[data-state="success"\][\s\S]*box-shadow:[\s\S]*#bbf7d0/i
   );
   assert.match(
     css,
-    /\.ytInlinePlayerControlsTopRightControlsCircleButton\.yt-home-transcript-player-button\[data-state="no_transcript"\]\s*\{[\s\S]*box-shadow:\s*inset 0 0 0 1px #fcd34d !important\s*;/i
+    /\.yt-home-transcript-player-button\[data-state="no_transcript"\][\s\S]*button[\s\S]*color:\s*#fde68a/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\[data-state="no_transcript"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#fcd34d\s*;/i
+    /\.yt-home-transcript-player-button\[data-state="no_transcript"\][\s\S]*box-shadow:[\s\S]*#fde68a/i
   );
   assert.match(
     css,
-    /\.ytInlinePlayerControlsTopRightControlsCircleButton\.yt-home-transcript-player-button\[data-state="error"\]\s*\{[\s\S]*box-shadow:\s*inset 0 0 0 1px #fca5a5 !important\s*;/i
+    /\.yt-home-transcript-player-button\[data-state="error"\][\s\S]*button[\s\S]*color:\s*#fecaca/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\[data-state="error"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#fca5a5\s*;/i
+    /\.yt-home-transcript-player-button\[data-state="error"\][\s\S]*box-shadow:[\s\S]*#fecaca/i
+  );
+  assert.match(
+    css,
+    /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.yt-home-transcript-player-button button[\s\S]*transition:\s*none !important[\s\S]*animation-duration:\s*0\.01ms/i
   );
 });
