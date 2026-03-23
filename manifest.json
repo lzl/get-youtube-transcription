@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Get Youtube Transcription (just one click)",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Extract YouTube video transcriptions with one click",
   "host_permissions": ["https://www.youtube.com/*"],
   "content_scripts": [
