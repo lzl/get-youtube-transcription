@@ -6,7 +6,7 @@
   }
 
   if (root) {
-    root.TranscriptHomeHoverActions = api;
+    root.TranscriptListHoverActions = api;
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   function getTranscriptDomApi() {
@@ -22,7 +22,7 @@
   }
 
   const transcriptDomApi = getTranscriptDomApi();
-  const HOME_CARD_SELECTOR = [
+  const LIST_CARD_SELECTOR = [
     'ytd-rich-grid-renderer ytd-rich-item-renderer',
     'ytd-rich-item-renderer',
   ].join(', ');
@@ -33,9 +33,9 @@
   const MODERN_PREVIEW_FALLBACK_SELECTOR = '.ytInlinePlayerControlsTopRightControls';
   const MODERN_PREVIEW_BUTTON_TEMPLATE_SELECTOR =
     '.ytInlinePlayerControlsTopRightControlsCircleButton';
-  const INJECTED_BUTTON_ATTR = 'data-yt-home-transcript-button';
-  const MODERN_PLAYER_BUTTON_CLASS = 'yt-home-transcript-player-button';
-  const HOME_HOVER_BUTTON_LABEL = 'Copy transcript';
+  const INJECTED_BUTTON_ATTR = 'data-yt-list-transcript-button';
+  const MODERN_PLAYER_BUTTON_CLASS = 'yt-list-transcript-player-button';
+  const LIST_HOVER_BUTTON_LABEL = 'Copy transcript';
   const TRANSCRIPT_ICON_PATH =
     transcriptDomApi?.TRANSCRIPT_ICON_PATH ||
     'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
@@ -44,13 +44,13 @@
     return locationRef?.pathname === '/watch';
   }
 
-  function getHomeCards(documentRef) {
+  function getListCards(documentRef) {
     if (!documentRef?.querySelectorAll) {
       return [];
     }
 
     const seenCards = new Set();
-    return Array.from(documentRef.querySelectorAll(HOME_CARD_SELECTOR)).filter((card) => {
+    return Array.from(documentRef.querySelectorAll(LIST_CARD_SELECTOR)).filter((card) => {
       if (!card || seenCards.has(card)) {
         return false;
       }
@@ -115,7 +115,7 @@
     });
   }
 
-  function updateTooltip(wrapper, text = HOME_HOVER_BUTTON_LABEL) {
+  function updateTooltip(wrapper, text = LIST_HOVER_BUTTON_LABEL) {
     const tooltip =
       wrapper?.querySelector?.('#tooltip, tp-yt-paper-tooltip #tooltip, yt-formatted-string') ||
       wrapper?.querySelector?.('#tooltip') ||
@@ -126,21 +126,21 @@
     }
   }
 
-  function configureHomeHoverButton(button, wrapper) {
+  function configureListHoverButton(button, wrapper) {
     if (!button) {
       return;
     }
 
-    button._ytTranscriptNormalTitle = HOME_HOVER_BUTTON_LABEL;
-    button._ytTranscriptNormalAriaLabel = HOME_HOVER_BUTTON_LABEL;
-    button.setAttribute?.('title', HOME_HOVER_BUTTON_LABEL);
-    button.setAttribute?.('aria-label', HOME_HOVER_BUTTON_LABEL);
-    button.title = HOME_HOVER_BUTTON_LABEL;
-    button.ariaLabel = HOME_HOVER_BUTTON_LABEL;
-    updateTooltip(wrapper, HOME_HOVER_BUTTON_LABEL);
+    button._ytTranscriptNormalTitle = LIST_HOVER_BUTTON_LABEL;
+    button._ytTranscriptNormalAriaLabel = LIST_HOVER_BUTTON_LABEL;
+    button.setAttribute?.('title', LIST_HOVER_BUTTON_LABEL);
+    button.setAttribute?.('aria-label', LIST_HOVER_BUTTON_LABEL);
+    button.title = LIST_HOVER_BUTTON_LABEL;
+    button.ariaLabel = LIST_HOVER_BUTTON_LABEL;
+    updateTooltip(wrapper, LIST_HOVER_BUTTON_LABEL);
   }
 
-  function handleHomeHoverButtonClick(event, button, buttonKind, watchUrl, onTranscriptButtonClick) {
+  function handleListHoverButtonClick(event, button, buttonKind, watchUrl, onTranscriptButtonClick) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
 
@@ -174,10 +174,10 @@
     button.removeAttribute?.('target-id');
     button.removeAttribute?.('href');
     button.type = 'button';
-    configureHomeHoverButton(button, wrapper);
+    configureListHoverButton(button, wrapper);
     iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
     button.addEventListener?.('click', (event) => {
-      handleHomeHoverButtonClick(event, button, 'native', canonicalUrl, onTranscriptButtonClick);
+      handleListHoverButtonClick(event, button, 'native', canonicalUrl, onTranscriptButtonClick);
     });
 
     return wrapper;
@@ -202,10 +202,10 @@
         wrapper.className = `${wrapper.className || ''} ${MODERN_PLAYER_BUTTON_CLASS}`.trim();
         button.removeAttribute?.('aria-pressed');
         button.type = 'button';
-        configureHomeHoverButton(button, wrapper);
+        configureListHoverButton(button, wrapper);
         iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
         button.addEventListener?.('click', (event) => {
-          handleHomeHoverButtonClick(
+          handleListHoverButtonClick(
             event,
             button,
             'modern',
@@ -239,7 +239,7 @@
     iconContainer.className = 'ytInlinePlayerControlsButtonIcon';
     button.className = 'ytmMuteButtonButton';
     button.type = 'button';
-    configureHomeHoverButton(button, wrapper);
+    configureListHoverButton(button, wrapper);
     icon.setAttribute?.('viewBox', '0 0 24 24');
     icon.setAttribute?.('aria-hidden', 'true');
     path.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
@@ -248,7 +248,7 @@
     iconContainer.appendChild?.(button);
     wrapper.appendChild?.(iconContainer);
     button.addEventListener?.('click', (event) => {
-      handleHomeHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
+      handleListHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
     });
 
     return wrapper;
@@ -311,7 +311,7 @@
     return templateButton;
   }
 
-  function createHomeHoverUrlController({
+  function createListHoverUrlController({
     documentRef,
     windowRef,
     locationRef,
@@ -463,7 +463,7 @@
         return;
       }
 
-      for (const card of getHomeCards(documentRef)) {
+      for (const card of getListCards(documentRef)) {
         injectIntoCard(card);
       }
     }
@@ -512,11 +512,11 @@
   }
 
   return {
-    BUTTON_LABEL: HOME_HOVER_BUTTON_LABEL,
-    HOME_CARD_SELECTOR,
+    BUTTON_LABEL: LIST_HOVER_BUTTON_LABEL,
+    LIST_CARD_SELECTOR,
     HOVER_BUTTON_SELECTOR,
     INJECTED_BUTTON_ATTR,
     TRANSCRIPT_ICON_PATH,
-    createHomeHoverUrlController,
+    createListHoverUrlController,
   };
 });

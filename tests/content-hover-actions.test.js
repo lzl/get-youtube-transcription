@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createHomeHoverUrlController } = require('../content-hover-actions.js');
+const { createListHoverUrlController } = require('../content-hover-actions.js');
 
 const TRANSCRIPT_BUTTON_TITLE = 'Copy transcript';
 const TRANSCRIPT_ICON_PATH = 'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
@@ -167,14 +167,14 @@ function matchesSelector(element, selector) {
     return element.tagName === 'YT-FORMATTED-STRING';
   }
 
-  if (selector === '[data-yt-home-transcript-button="true"]') {
-    return element.getAttribute('data-yt-home-transcript-button') === 'true';
+  if (selector === '[data-yt-list-transcript-button="true"]') {
+    return element.getAttribute('data-yt-list-transcript-button') === 'true';
   }
 
-  if (selector === '[data-yt-home-transcript-button="true"].yt-home-transcript-player-button') {
+  if (selector === '[data-yt-list-transcript-button="true"].yt-list-transcript-player-button') {
     return (
-      element.getAttribute('data-yt-home-transcript-button') === 'true' &&
-      String(element.className).split(/\s+/).includes('yt-home-transcript-player-button')
+      element.getAttribute('data-yt-list-transcript-button') === 'true' &&
+      String(element.className).split(/\s+/).includes('yt-list-transcript-player-button')
     );
   }
 
@@ -429,12 +429,12 @@ function createDocument(cards, options = {}) {
   };
 }
 
-test('home hover controller injects one native-looking transcript button and reports the clicked watch URL', () => {
+test('list hover controller injects one native-looking transcript button and reports the clicked watch URL', () => {
   const card = createCard({
     href: '/watch?v=abc123&pp=ygUPc29tZXRoaW5nLWVsc2U%3D',
   });
   const clickPayloads = [];
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef: createDocument([card]),
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -449,11 +449,11 @@ test('home hover controller injects one native-looking transcript button and rep
 
   controller.refresh();
 
-  const insertedWrapper = card.querySelector('[data-yt-home-transcript-button="true"]');
+  const insertedWrapper = card.querySelector('[data-yt-list-transcript-button="true"]');
   const insertedButton = insertedWrapper.querySelector('button');
 
   assert.ok(insertedWrapper);
-  assert.match(insertedWrapper.className, /yt-home-transcript-player-button/);
+  assert.match(insertedWrapper.className, /yt-list-transcript-player-button/);
   assert.equal(insertedButton.title, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedButton.ariaLabel, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedButton._ytTranscriptNormalTitle, TRANSCRIPT_BUTTON_TITLE);
@@ -473,10 +473,10 @@ test('home hover controller injects one native-looking transcript button and rep
 
   controller.refresh();
 
-  assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
+  assert.equal(card.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 1);
 });
 
-test('home hover controller injects the modern transcript button into the inline preview top-right controls cluster', () => {
+test('list hover controller injects the modern transcript button into the inline preview top-right controls cluster', () => {
   const card = createCard({
     href: '/watch?v=modern123',
     modern: true,
@@ -486,7 +486,7 @@ test('home hover controller injects the modern transcript button into the inline
   const documentRef = createDocument([card], {
     withGlobalPreviewControls: true,
   });
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef,
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -501,7 +501,7 @@ test('home hover controller injects the modern transcript button into the inline
 
   controller.refresh();
 
-  const insertedWrapper = documentRef.querySelector('[data-yt-home-transcript-button="true"]');
+  const insertedWrapper = documentRef.querySelector('[data-yt-list-transcript-button="true"]');
   const insertedButton = insertedWrapper.querySelector('button');
 
   assert.ok(insertedWrapper);
@@ -511,7 +511,7 @@ test('home hover controller injects the modern transcript button into the inline
   assert.equal(insertedButton?._ytTranscriptNormalTitle, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedButton?._ytTranscriptNormalAriaLabel, TRANSCRIPT_BUTTON_TITLE);
   assert.equal(insertedWrapper.querySelector('svg path').getAttribute('d'), TRANSCRIPT_ICON_PATH);
-  assert.match(insertedWrapper.className, /yt-home-transcript-player-button/);
+  assert.match(insertedWrapper.className, /yt-list-transcript-player-button/);
 
   const clickEvent = createEvent();
   const enterHandler = card.listeners.get('mouseenter');
@@ -528,14 +528,14 @@ test('home hover controller injects the modern transcript button into the inline
 
   controller.refresh();
 
-  assert.equal(documentRef.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
+  assert.equal(documentRef.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 1);
 });
 
-test('home hover controller injects on non-home list pages that reuse the same card structure', () => {
+test('list hover controller injects on non-watch list pages that reuse the same card structure', () => {
   const card = createCard({
     href: '/watch?v=listpage123',
   });
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef: createDocument([card]),
     locationRef: { pathname: '/feed/subscriptions' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -548,16 +548,16 @@ test('home hover controller injects on non-home list pages that reuse the same c
 
   controller.refresh();
 
-  assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
+  assert.equal(card.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 1);
 });
 
-test('home hover controller waits for modern preview controls instead of creating a standalone overlay', () => {
+test('list hover controller waits for modern preview controls instead of creating a standalone overlay', () => {
   const card = createCard({
     href: '/watch?v=modern456',
     modern: true,
     withButtons: false,
   });
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef: createDocument([card]),
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -570,10 +570,10 @@ test('home hover controller waits for modern preview controls instead of creatin
 
   controller.refresh();
 
-  assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
+  assert.equal(card.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
 });
 
-test('home hover controller keeps retrying until the active modern controls cluster gets the injected button', () => {
+test('list hover controller keeps retrying until the active modern controls cluster gets the injected button', () => {
   const card = createCard({
     href: '/watch?v=modern999',
     modern: true,
@@ -583,14 +583,14 @@ test('home hover controller keeps retrying until the active modern controls clus
   const documentRef = createDocument([card]);
   const stalePreviewControls = createModernPreviewControls();
   const staleInjectedButton = createMockElement('div', {
-    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-home-transcript-player-button',
-    attributes: { 'data-yt-home-transcript-button': 'true' },
+    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-list-transcript-player-button',
+    attributes: { 'data-yt-list-transcript-button': 'true' },
   });
 
   stalePreviewControls.topRightControls.appendChild(staleInjectedButton);
   documentRef.body.appendChild(stalePreviewControls.controlsHost);
 
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef,
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -620,13 +620,13 @@ test('home hover controller keeps retrying until the active modern controls clus
   scheduledCallbacks.shift()();
 
   const injectedButtons = freshPreviewControls.topRightControls.querySelectorAll(
-    '[data-yt-home-transcript-button="true"]'
+    '[data-yt-list-transcript-button="true"]'
   );
 
   assert.equal(injectedButtons.length, 1);
 });
 
-test('home hover controller retries modern preview injection when preview controls appear after hover starts', () => {
+test('list hover controller retries modern preview injection when preview controls appear after hover starts', () => {
   const card = createCard({
     href: '/watch?v=modern789',
     modern: true,
@@ -635,7 +635,7 @@ test('home hover controller retries modern preview injection when preview contro
   const clickPayloads = [];
   const scheduledCallbacks = [];
   const documentRef = createDocument([card]);
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef,
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -676,12 +676,12 @@ test('home hover controller retries modern preview injection when preview contro
   previewRoot.appendChild(mediaContainer);
   documentRef.body.appendChild(previewRoot);
 
-  assert.equal(documentRef.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
+  assert.equal(documentRef.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
   assert.equal(scheduledCallbacks.length > 0, true);
 
   scheduledCallbacks.shift()();
 
-  const insertedWrapper = documentRef.querySelector('[data-yt-home-transcript-button="true"]');
+  const insertedWrapper = documentRef.querySelector('[data-yt-list-transcript-button="true"]');
   const insertedButton = insertedWrapper.querySelector('button');
   assert.ok(insertedWrapper);
   assert.equal(insertedWrapper.parentNode, previewControls.topRightControls);
@@ -697,12 +697,12 @@ test('home hover controller retries modern preview injection when preview contro
   assert.equal(clickEvent.propagationStopped, true);
 });
 
-test('home hover controller skips watch pages even when cards have valid watch targets', () => {
+test('list hover controller skips watch pages even when cards have valid watch targets', () => {
   const cards = [
     createCard({ href: '/watch?v=abc123', withButtons: false }),
     createCard({ href: '/watch?v=def456' }),
   ];
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef: createDocument(cards),
     locationRef: { pathname: '/watch' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -715,16 +715,16 @@ test('home hover controller skips watch pages even when cards have valid watch t
 
   controller.refresh();
 
-  assert.equal(cards[0].querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
-  assert.equal(cards[1].querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
+  assert.equal(cards[0].querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
+  assert.equal(cards[1].querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
 });
 
-test('home hover controller skips cards without a valid watch button target on list pages', () => {
+test('list hover controller skips cards without a valid watch button target on list pages', () => {
   const cards = [
     createCard({ href: null, withButtons: false }),
     createCard({ href: '/watch?v=abc123', withButtons: false }),
   ];
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef: createDocument(cards),
     locationRef: { pathname: '/results' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -737,15 +737,15 @@ test('home hover controller skips cards without a valid watch button target on l
 
   controller.refresh();
 
-  assert.equal(cards[0].querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
-  assert.equal(cards[1].querySelectorAll('[data-yt-home-transcript-button="true"]').length, 0);
+  assert.equal(cards[0].querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
+  assert.equal(cards[1].querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
 });
 
-test('home hover controller starts and stops its observer around refreshes', () => {
+test('list hover controller starts and stops its observer around refreshes', () => {
   const card = createCard({ href: '/watch?v=observer123' });
   const observeCalls = [];
   const disconnectCalls = [];
-  const controller = createHomeHoverUrlController({
+  const controller = createListHoverUrlController({
     documentRef: createDocument([card]),
     locationRef: { pathname: '/' },
     windowRef: { location: { origin: 'https://www.youtube.com' } },
@@ -767,7 +767,7 @@ test('home hover controller starts and stops its observer around refreshes', () 
 
   controller.start();
 
-  assert.equal(card.querySelectorAll('[data-yt-home-transcript-button="true"]').length, 1);
+  assert.equal(card.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 1);
   assert.equal(observeCalls.length, 1);
 
   controller.stop();

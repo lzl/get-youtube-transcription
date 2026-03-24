@@ -217,7 +217,7 @@ function createStatefulButton() {
 function createHoverStatefulButton() {
   const wrapper = {
     dataset: {},
-    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-home-transcript-player-button',
+    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-list-transcript-player-button',
     style: {},
   };
   const path = {
@@ -321,7 +321,7 @@ test('content-dom updates hover button loading state and keeps it disabled', () 
   assert.equal(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
 });
 
-test('content-dom restores hover button normal title and aria label from the hover-specific defaults', () => {
+test('content-dom restores hover button normal title and aria label from the list-hover defaults', () => {
   const { button } = createHoverStatefulButton();
 
   dom.updateHoverButtonState(button, 'success');

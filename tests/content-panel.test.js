@@ -191,7 +191,7 @@ test('handleTranscriptButtonClick maps clipboard failures to error feedback', as
   });
 });
 
-test('handlePageChange starts home hover controller on the home page', () => {
+test('handlePageChange starts list hover controller on the root list page', () => {
   const extension = Object.create(YoutubeTranscriptionExtension.prototype);
   const calls = [];
 
@@ -202,21 +202,21 @@ test('handlePageChange starts home hover controller on the home page', () => {
   extension.cleanupPreviousButton = () => {
     calls.push('cleanup-watch');
   };
-  extension.homeHoverController = {
+  extension.listHoverController = {
     start() {
-      calls.push('start-home-hover');
+      calls.push('start-list-hover');
     },
     stop() {
-      calls.push('stop-home-hover');
+      calls.push('stop-list-hover');
     },
   };
 
   extension.handlePageChange('https://www.youtube.com/');
 
-  assert.deepEqual(calls, ['cleanup-watch', 'start-home-hover']);
+  assert.deepEqual(calls, ['cleanup-watch', 'start-list-hover']);
 });
 
-test('handlePageChange starts home hover controller on non-watch list pages', () => {
+test('handlePageChange starts list hover controller on non-watch list pages', () => {
   const extension = Object.create(YoutubeTranscriptionExtension.prototype);
   const calls = [];
 
@@ -227,21 +227,21 @@ test('handlePageChange starts home hover controller on non-watch list pages', ()
   extension.cleanupPreviousButton = () => {
     calls.push('cleanup-watch');
   };
-  extension.homeHoverController = {
+  extension.listHoverController = {
     start() {
-      calls.push('start-home-hover');
+      calls.push('start-list-hover');
     },
     stop() {
-      calls.push('stop-home-hover');
+      calls.push('stop-list-hover');
     },
   };
 
   extension.handlePageChange('https://www.youtube.com/feed/subscriptions');
 
-  assert.deepEqual(calls, ['cleanup-watch', 'start-home-hover']);
+  assert.deepEqual(calls, ['cleanup-watch', 'start-list-hover']);
 });
 
-test('handlePageChange stops home hover controller and resumes watch button handling on watch pages', () => {
+test('handlePageChange stops list hover controller and resumes watch button handling on watch pages', () => {
   const extension = Object.create(YoutubeTranscriptionExtension.prototype);
   const calls = [];
 
@@ -252,21 +252,21 @@ test('handlePageChange stops home hover controller and resumes watch button hand
   extension.cleanupPreviousButton = () => {
     calls.push('cleanup-watch');
   };
-  extension.homeHoverController = {
+  extension.listHoverController = {
     start() {
-      calls.push('start-home-hover');
+      calls.push('start-list-hover');
     },
     stop() {
-      calls.push('stop-home-hover');
+      calls.push('stop-list-hover');
     },
   };
 
   extension.handlePageChange('https://www.youtube.com/watch?v=video-123');
 
-  assert.deepEqual(calls, ['stop-home-hover', 'start-watch']);
+  assert.deepEqual(calls, ['stop-list-hover', 'start-watch']);
 });
 
-test('findCaptionToggleButton returns the last visible homepage preview cc button', () => {
+test('findCaptionToggleButton returns the last visible list-page preview cc button', () => {
   const hiddenPreviewButton = {
     className: 'ytmClosedCaptioningButtonButton',
   };

@@ -34,9 +34,9 @@ function getTranscriptWorkflowApi() {
   return null;
 }
 
-function getHomeHoverActionsApi() {
-  if (typeof window !== 'undefined' && window.TranscriptHomeHoverActions) {
-    return window.TranscriptHomeHoverActions;
+function getListHoverActionsApi() {
+  if (typeof window !== 'undefined' && window.TranscriptListHoverActions) {
+    return window.TranscriptListHoverActions;
   }
 
   if (typeof require === 'function') {
@@ -53,7 +53,7 @@ const WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS = [
   '#movie_player button.ytp-subtitles-button',
   '#movie_player .ytp-right-controls-left button.ytp-subtitles-button',
 ];
-const HOME_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS = [
+const LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS = [
   '.ytInlinePlayerControlsTopRightControls .ytmClosedCaptioningButtonButton',
 ];
 
@@ -76,7 +76,7 @@ class YoutubeTranscriptionExtension {
     this.dom = getTranscriptDomApi();
     this.core = getTranscriptCoreApi();
     this.workflow = null;
-    this.homeHoverController = null;
+    this.listHoverController = null;
 
     this.initializeExtension();
   }
@@ -105,16 +105,16 @@ class YoutubeTranscriptionExtension {
       transcriptSegmentSelector: this.dom.TRANSCRIPT_SEGMENT_SELECTOR,
     });
 
-    const homeHoverActionsApi = getHomeHoverActionsApi();
+    const listHoverActionsApi = getListHoverActionsApi();
 
-    if (homeHoverActionsApi?.createHomeHoverUrlController) {
-      this.homeHoverController = homeHoverActionsApi.createHomeHoverUrlController({
+    if (listHoverActionsApi?.createListHoverUrlController) {
+      this.listHoverController = listHoverActionsApi.createListHoverUrlController({
         documentRef: document,
         windowRef: window,
         locationRef: window.location,
         MutationObserverCtor: MutationObserver,
         onTranscriptButtonClick: ({ buttonElement, watchUrl }) => {
-          void this.handleHomeHoverTranscriptButtonClick({
+          void this.handleListHoverTranscriptButtonClick({
             buttonElement,
             watchUrl,
           });
@@ -139,10 +139,7 @@ class YoutubeTranscriptionExtension {
 
       lastUrl = currentUrl;
 
-      if (!this.isHomePage(currentUrl)) {
-        this.cleanupPreviousButton();
-      }
-
+      this.cleanupPreviousButton();
       this.handlePageChange(currentUrl);
     };
 
@@ -221,23 +218,15 @@ class YoutubeTranscriptionExtension {
     return this.core.getVideoIdFromUrl(url);
   }
 
-  isHomePage(url = window.location.href) {
-    try {
-      return new URL(url).pathname === '/';
-    } catch (error) {
-      return false;
-    }
-  }
-
   handlePageChange(url = window.location.href) {
     if (this.isYoutubeVideoPage(url)) {
-      this.homeHoverController?.stop?.();
+      this.listHoverController?.stop?.();
       this.startObservingButtonContainer();
       return;
     }
 
     this.cleanupPreviousButton();
-    this.homeHoverController?.start?.();
+    this.listHoverController?.start?.();
   }
 
   findSuitableButtonContainer() {
@@ -277,7 +266,7 @@ class YoutubeTranscriptionExtension {
   findCaptionToggleButton(documentRef = document) {
     return (
       this.findFirstVisibleElement(documentRef, WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS) ||
-      this.findLastVisibleElement(documentRef, HOME_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS)
+      this.findLastVisibleElement(documentRef, LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS)
     );
   }
 
@@ -361,7 +350,7 @@ class YoutubeTranscriptionExtension {
     });
   }
 
-  async handleHomeHoverTranscriptButtonClick({ buttonElement, watchUrl }) {
+  async handleListHoverTranscriptButtonClick({ buttonElement, watchUrl }) {
     return this.runTranscriptAction({
       allowPanelFallback: false,
       button: buttonElement,

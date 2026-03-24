@@ -1,6 +1,6 @@
 # Real Chrome Test Loop
 
-This document describes the reusable test loop for validating the YouTube homepage hover behavior in a real Chrome session.
+This document describes the reusable test loop for validating the YouTube list-page hover behavior in a real Chrome session.
 
 The goal is to let future agents test the extension against the user's actual browser state instead of a separate headless browser.
 
@@ -8,7 +8,7 @@ The goal is to let future agents test the extension against the user's actual br
 
 Use this loop when:
 
-- the feature depends on real YouTube homepage behavior
+- the feature depends on real YouTube list-page hover behavior
 - the user explicitly asks to test in their current Chrome window
 - hover timing, preview players, or extension injection differ from a clean headless run
 
@@ -28,7 +28,7 @@ Before starting, confirm:
 
 Treat the real browser as the source of truth.
 
-For YouTube homepage hover testing, a synthetic `browser-use hover <index>` may be insufficient. Prefer a low-level mouse move through the connected page object when you need the actual preview player to appear.
+For YouTube list-page hover testing, a synthetic `browser-use hover <index>` may be insufficient. Prefer a low-level mouse move through the connected page object when you need the actual preview player to appear.
 
 ## Session Setup
 
@@ -146,7 +146,7 @@ result = browser._run(page.evaluate("""() => {
     children: controls
       ? Array.from(controls.children).map((el) => ({
           cls: el.className || null,
-          injected: el.getAttribute("data-yt-home-transcript-button"),
+          injected: el.getAttribute("data-yt-list-transcript-button"),
           title: el.querySelector("button")?.getAttribute("title"),
           aria: el.querySelector("button")?.getAttribute("aria-label"),
         }))
@@ -161,7 +161,7 @@ Expected success signal:
 
 - `hasControls: true`
 - `childCount: 3`
-- one child with `data-yt-home-transcript-button="true"`
+- one child with `data-yt-list-transcript-button="true"`
 - that child's button title should be `Copy transcript`
 
 ### 5. Capture a screenshot in the same hover session
@@ -192,7 +192,7 @@ On the current YouTube homepage, the visible hover button group is the top-right
 yt-inline-player-controls .ytInlinePlayerControlsTopRightControls
 ```
 
-Do not assume the visible homepage hover buttons live in:
+Do not assume the visible list-page hover buttons live in:
 
 ```text
 #inline-preview-player .ytp-right-controls
@@ -279,7 +279,7 @@ result = browser._run(page.evaluate("""() => {
     hasControls: Boolean(controls),
     childCount: controls ? controls.children.length : 0,
     children: controls ? Array.from(controls.children).map((el) => ({
-      injected: el.getAttribute("data-yt-home-transcript-button"),
+      injected: el.getAttribute("data-yt-list-transcript-button"),
       title: el.querySelector("button")?.getAttribute("title"),
     })) : [],
   };

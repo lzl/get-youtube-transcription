@@ -298,7 +298,7 @@
     const resolvedState = BUTTON_STATES[state] ? state : 'normal';
     const nextState = BUTTON_STATES[resolvedState];
     const iconPath = button.querySelector?.('svg path');
-    const wrapper = findAncestorByClassName(button, 'yt-home-transcript-player-button');
+    const wrapper = findAncestorByClassName(button, 'yt-list-transcript-player-button');
     const nextTitle =
       resolvedState === 'normal' ? button._ytTranscriptNormalTitle || nextState.title : nextState.title;
     const nextAriaLabel =
