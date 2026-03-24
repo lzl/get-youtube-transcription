@@ -233,40 +233,30 @@ class YoutubeTranscriptionExtension {
     return this.dom.findSuitableButtonContainer(document);
   }
 
-  findFirstVisibleElement(documentRef, selectors) {
-    for (const selector of selectors) {
-      const matches = Array.from(documentRef?.querySelectorAll?.(selector) || []);
-
-      for (const match of matches) {
-        if (this.isElementVisible(match)) {
-          return match;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  findLastVisibleElement(documentRef, selectors) {
-    let lastVisibleElement = null;
+  findVisibleElement(documentRef, selectors, mode = 'first') {
+    let result = null;
 
     for (const selector of selectors) {
       const matches = Array.from(documentRef?.querySelectorAll?.(selector) || []);
 
       for (const match of matches) {
         if (this.isElementVisible(match)) {
-          lastVisibleElement = match;
+          if (mode === 'first') {
+            return match;
+          }
+
+          result = match;
         }
       }
     }
 
-    return lastVisibleElement;
+    return result;
   }
 
   findCaptionToggleButton(documentRef = document) {
     return (
-      this.findFirstVisibleElement(documentRef, WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS) ||
-      this.findLastVisibleElement(documentRef, LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS)
+      this.findVisibleElement(documentRef, WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS, 'first') ||
+      this.findVisibleElement(documentRef, LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS, 'last')
     );
   }
 
@@ -489,20 +479,6 @@ class YoutubeTranscriptionExtension {
 
   waitForSelector(selector, timeout = 3000) {
     return this.dom.waitForSelector(document, selector, timeout);
-  }
-
-  timestampToMilliseconds(timestamp) {
-    const parts = timestamp.split(':').map((part) => Number(part));
-
-    if (parts.length === 2) {
-      return ((parts[0] * 60) + parts[1]) * 1000;
-    }
-
-    if (parts.length === 3) {
-      return ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
-    }
-
-    return 0;
   }
 
   isElementVisible(element) {

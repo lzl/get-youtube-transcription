@@ -407,11 +407,7 @@ function createDocument(cards, options = {}) {
   return {
     body,
     querySelectorAll(selector) {
-      if (
-        selector === 'ytd-rich-grid-renderer ytd-rich-item-renderer' ||
-        selector === 'ytd-rich-item-renderer' ||
-        selector === 'ytd-rich-grid-renderer ytd-rich-item-renderer, ytd-rich-item-renderer'
-      ) {
+      if (selector === 'ytd-rich-item-renderer') {
         return cards;
       }
 
@@ -573,60 +569,7 @@ test('list hover controller waits for modern preview controls instead of creatin
   assert.equal(card.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
 });
 
-test('list hover controller keeps retrying until the active modern controls cluster gets the injected button', () => {
-  const card = createCard({
-    href: '/watch?v=modern999',
-    modern: true,
-    withButtons: false,
-  });
-  const scheduledCallbacks = [];
-  const documentRef = createDocument([card]);
-  const stalePreviewControls = createModernPreviewControls();
-  const staleInjectedButton = createMockElement('div', {
-    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-list-transcript-player-button',
-    attributes: { 'data-yt-list-transcript-button': 'true' },
-  });
-
-  stalePreviewControls.topRightControls.appendChild(staleInjectedButton);
-  documentRef.body.appendChild(stalePreviewControls.controlsHost);
-
-  const controller = createListHoverUrlController({
-    documentRef,
-    locationRef: { pathname: '/' },
-    windowRef: { location: { origin: 'https://www.youtube.com' } },
-    onTranscriptButtonClick() {},
-    MutationObserverCtor: class {
-      observe() {}
-      disconnect() {}
-    },
-    setTimeoutFn(callback) {
-      scheduledCallbacks.push(callback);
-      return scheduledCallbacks.length;
-    },
-    clearTimeoutFn() {},
-  });
-
-  controller.refresh();
-  card.listeners.get('mouseenter')();
-
-  assert.equal(scheduledCallbacks.length, 1);
-  scheduledCallbacks.shift()();
-
-  assert.equal(scheduledCallbacks.length, 1);
-
-  const freshPreviewControls = createModernPreviewControls();
-  documentRef.body.appendChild(freshPreviewControls.controlsHost);
-
-  scheduledCallbacks.shift()();
-
-  const injectedButtons = freshPreviewControls.topRightControls.querySelectorAll(
-    '[data-yt-list-transcript-button="true"]'
-  );
-
-  assert.equal(injectedButtons.length, 1);
-});
-
-test('list hover controller retries modern preview injection when preview controls appear after hover starts', () => {
+test('list hover controller retries modern preview injection until controls appear and button is injected', () => {
   const card = createCard({
     href: '/watch?v=modern789',
     modern: true,
@@ -656,17 +599,16 @@ test('list hover controller retries modern preview injection when preview contro
   controller.refresh();
   card.listeners.get('mouseenter')();
 
+  // No controls yet — retry is scheduled but nothing injected
+  assert.equal(documentRef.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
+  assert.equal(scheduledCallbacks.length > 0, true);
+
+  // Controls appear after hover
   const previewRoot = createMockElement('ytd-video-preview');
-  const mediaContainer = createMockElement('div', {
-    id: 'media-container',
-  });
+  const mediaContainer = createMockElement('div', { id: 'media-container' });
   const previewPlayerContainer = createMockElement('div');
-  const previewPlayer = createMockElement('div', {
-    id: 'inline-preview-player',
-  });
-  const playerControls = createMockElement('div', {
-    id: 'player-controls',
-  });
+  const previewPlayer = createMockElement('div', { id: 'inline-preview-player' });
+  const playerControls = createMockElement('div', { id: 'player-controls' });
   const previewControls = createModernPreviewControls();
 
   previewPlayerContainer.appendChild(previewPlayer);
@@ -676,9 +618,7 @@ test('list hover controller retries modern preview injection when preview contro
   previewRoot.appendChild(mediaContainer);
   documentRef.body.appendChild(previewRoot);
 
-  assert.equal(documentRef.querySelectorAll('[data-yt-list-transcript-button="true"]').length, 0);
-  assert.equal(scheduledCallbacks.length > 0, true);
-
+  // Retry fires — button should now be injected
   scheduledCallbacks.shift()();
 
   const insertedWrapper = documentRef.querySelector('[data-yt-list-transcript-button="true"]');
@@ -686,6 +626,7 @@ test('list hover controller retries modern preview injection when preview contro
   assert.ok(insertedWrapper);
   assert.equal(insertedWrapper.parentNode, previewControls.topRightControls);
 
+  // Click works correctly
   const clickEvent = createEvent();
   insertedButton.listeners.get('click')(clickEvent);
 

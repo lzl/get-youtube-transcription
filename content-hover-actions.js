@@ -22,10 +22,7 @@
   }
 
   const transcriptDomApi = getTranscriptDomApi();
-  const LIST_CARD_SELECTOR = [
-    'ytd-rich-grid-renderer ytd-rich-item-renderer',
-    'ytd-rich-item-renderer',
-  ].join(', ');
+  const LIST_CARD_SELECTOR = 'ytd-rich-item-renderer';
   const WATCH_LINK_SELECTOR = 'a[href*="/watch"]';
   const HOVER_BUTTON_SELECTOR = 'ytd-thumbnail-overlay-toggle-button-renderer';
   const MODERN_PREVIEW_CONTROLS_SELECTOR =
@@ -49,15 +46,7 @@
       return [];
     }
 
-    const seenCards = new Set();
-    return Array.from(documentRef.querySelectorAll(LIST_CARD_SELECTOR)).filter((card) => {
-      if (!card || seenCards.has(card)) {
-        return false;
-      }
-
-      seenCards.add(card);
-      return true;
-    });
+    return Array.from(documentRef.querySelectorAll(LIST_CARD_SELECTOR));
   }
 
   function getQueryMatches(root, selector) {
@@ -191,6 +180,17 @@
     return documentRef?.createElement?.(tagName) || null;
   }
 
+  function configureModernWrapper(wrapper, button, iconPath, getCurrentWatchUrl, onTranscriptButtonClick) {
+    wrapper.setAttribute?.(INJECTED_BUTTON_ATTR, 'true');
+    wrapper.className = `${wrapper.className || ''} ${MODERN_PLAYER_BUTTON_CLASS}`.trim();
+    button.type = 'button';
+    configureListHoverButton(button, wrapper);
+    iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
+    button.addEventListener?.('click', (event) => {
+      handleListHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
+    });
+  }
+
   function createModernPlayerButton(documentRef, templateButton, getCurrentWatchUrl, onTranscriptButtonClick) {
     if (templateButton?.cloneNode) {
       const wrapper = templateButton.cloneNode(true);
@@ -198,22 +198,8 @@
       const iconPath = wrapper?.querySelector?.('svg path');
 
       if (wrapper && button && iconPath) {
-        wrapper.setAttribute?.(INJECTED_BUTTON_ATTR, 'true');
-        wrapper.className = `${wrapper.className || ''} ${MODERN_PLAYER_BUTTON_CLASS}`.trim();
         button.removeAttribute?.('aria-pressed');
-        button.type = 'button';
-        configureListHoverButton(button, wrapper);
-        iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
-        button.addEventListener?.('click', (event) => {
-          handleListHoverButtonClick(
-            event,
-            button,
-            'modern',
-            getCurrentWatchUrl?.(),
-            onTranscriptButtonClick
-          );
-        });
-
+        configureModernWrapper(wrapper, button, iconPath, getCurrentWatchUrl, onTranscriptButtonClick);
         return wrapper;
       }
     }
@@ -234,22 +220,16 @@
       return null;
     }
 
-    wrapper.setAttribute?.(INJECTED_BUTTON_ATTR, 'true');
-    wrapper.className = `ytInlinePlayerControlsTopRightControlsCircleButton ${MODERN_PLAYER_BUTTON_CLASS}`;
+    wrapper.className = `ytInlinePlayerControlsTopRightControlsCircleButton`;
     iconContainer.className = 'ytInlinePlayerControlsButtonIcon';
     button.className = 'ytmMuteButtonButton';
-    button.type = 'button';
-    configureListHoverButton(button, wrapper);
     icon.setAttribute?.('viewBox', '0 0 24 24');
     icon.setAttribute?.('aria-hidden', 'true');
-    path.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
     icon.appendChild?.(path);
     button.appendChild?.(icon);
     iconContainer.appendChild?.(button);
     wrapper.appendChild?.(iconContainer);
-    button.addEventListener?.('click', (event) => {
-      handleListHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
-    });
+    configureModernWrapper(wrapper, button, path, getCurrentWatchUrl, onTranscriptButtonClick);
 
     return wrapper;
   }
@@ -494,6 +474,7 @@
       pendingPreviewSeed = null;
       currentHoveredCard = null;
       currentHoveredWatchUrl = null;
+      trackedCards.clear();
 
       if (!observer) {
         return;

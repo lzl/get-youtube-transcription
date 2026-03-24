@@ -191,9 +191,9 @@ test('handleTranscriptButtonClick maps clipboard failures to error feedback', as
   });
 });
 
-test('handlePageChange starts list hover controller on the root list page', () => {
-  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+function createPageChangeStub() {
   const calls = [];
+  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
 
   extension.startObservingButtonContainer = () => {
     calls.push('start-watch');
@@ -210,6 +210,12 @@ test('handlePageChange starts list hover controller on the root list page', () =
       calls.push('stop-list-hover');
     },
   };
+
+  return { extension, calls };
+}
+
+test('handlePageChange starts list hover controller on the root list page', () => {
+  const { extension, calls } = createPageChangeStub();
 
   extension.handlePageChange('https://www.youtube.com/');
 
@@ -217,24 +223,7 @@ test('handlePageChange starts list hover controller on the root list page', () =
 });
 
 test('handlePageChange starts list hover controller on non-watch list pages', () => {
-  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
-  const calls = [];
-
-  extension.startObservingButtonContainer = () => {
-    calls.push('start-watch');
-  };
-  extension.getVideoId = (url) => (url.includes('watch?v=') ? 'video-123' : null);
-  extension.cleanupPreviousButton = () => {
-    calls.push('cleanup-watch');
-  };
-  extension.listHoverController = {
-    start() {
-      calls.push('start-list-hover');
-    },
-    stop() {
-      calls.push('stop-list-hover');
-    },
-  };
+  const { extension, calls } = createPageChangeStub();
 
   extension.handlePageChange('https://www.youtube.com/feed/subscriptions');
 
@@ -242,24 +231,7 @@ test('handlePageChange starts list hover controller on non-watch list pages', ()
 });
 
 test('handlePageChange stops list hover controller and resumes watch button handling on watch pages', () => {
-  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
-  const calls = [];
-
-  extension.startObservingButtonContainer = () => {
-    calls.push('start-watch');
-  };
-  extension.getVideoId = (url) => (url.includes('watch?v=') ? 'video-123' : null);
-  extension.cleanupPreviousButton = () => {
-    calls.push('cleanup-watch');
-  };
-  extension.listHoverController = {
-    start() {
-      calls.push('start-list-hover');
-    },
-    stop() {
-      calls.push('stop-list-hover');
-    },
-  };
+  const { extension, calls } = createPageChangeStub();
 
   extension.handlePageChange('https://www.youtube.com/watch?v=video-123');
 

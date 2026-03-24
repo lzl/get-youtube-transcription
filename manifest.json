@@ -14,7 +14,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["styles.css", "transcript-core.js", "content-dom.js", "content-transcript.js", "content-hover-actions.js"],
+      "resources": ["styles.css", "transcript-core.js", "content-transcript.js"],
       "matches": ["https://www.youtube.com/*"]
     }
   ],
