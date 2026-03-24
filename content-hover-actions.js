@@ -22,7 +22,10 @@
   }
 
   const transcriptDomApi = getTranscriptDomApi();
-  const HOME_CARD_SELECTOR = 'ytd-rich-grid-renderer ytd-rich-item-renderer';
+  const HOME_CARD_SELECTOR = [
+    'ytd-rich-grid-renderer ytd-rich-item-renderer',
+    'ytd-rich-item-renderer',
+  ].join(', ');
   const WATCH_LINK_SELECTOR = 'a[href*="/watch"]';
   const HOVER_BUTTON_SELECTOR = 'ytd-thumbnail-overlay-toggle-button-renderer';
   const MODERN_PREVIEW_CONTROLS_SELECTOR =
@@ -37,8 +40,8 @@
     transcriptDomApi?.TRANSCRIPT_ICON_PATH ||
     'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
 
-  function isHomePage(locationRef) {
-    return locationRef?.pathname === '/';
+  function isWatchPage(locationRef) {
+    return locationRef?.pathname === '/watch';
   }
 
   function getHomeCards(documentRef) {
@@ -46,7 +49,15 @@
       return [];
     }
 
-    return Array.from(documentRef.querySelectorAll(HOME_CARD_SELECTOR));
+    const seenCards = new Set();
+    return Array.from(documentRef.querySelectorAll(HOME_CARD_SELECTOR)).filter((card) => {
+      if (!card || seenCards.has(card)) {
+        return false;
+      }
+
+      seenCards.add(card);
+      return true;
+    });
   }
 
   function getQueryMatches(root, selector) {
@@ -168,9 +179,6 @@
     button.addEventListener?.('click', (event) => {
       handleHomeHoverButtonClick(event, button, 'native', canonicalUrl, onTranscriptButtonClick);
     });
-    wrapper.addEventListener?.('click', (event) => {
-      handleHomeHoverButtonClick(event, button, 'native', canonicalUrl, onTranscriptButtonClick);
-    });
 
     return wrapper;
   }
@@ -197,15 +205,6 @@
         configureHomeHoverButton(button, wrapper);
         iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
         button.addEventListener?.('click', (event) => {
-          handleHomeHoverButtonClick(
-            event,
-            button,
-            'modern',
-            getCurrentWatchUrl?.(),
-            onTranscriptButtonClick
-          );
-        });
-        wrapper.addEventListener?.('click', (event) => {
           handleHomeHoverButtonClick(
             event,
             button,
@@ -249,9 +248,6 @@
     iconContainer.appendChild?.(button);
     wrapper.appendChild?.(iconContainer);
     button.addEventListener?.('click', (event) => {
-      handleHomeHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
-    });
-    wrapper.addEventListener?.('click', (event) => {
       handleHomeHoverButtonClick(event, button, 'modern', getCurrentWatchUrl?.(), onTranscriptButtonClick);
     });
 
@@ -463,7 +459,7 @@
     }
 
     function refresh() {
-      if (!isHomePage(locationRef)) {
+      if (isWatchPage(locationRef)) {
         return;
       }
 

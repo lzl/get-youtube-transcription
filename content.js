@@ -230,17 +230,14 @@ class YoutubeTranscriptionExtension {
   }
 
   handlePageChange(url = window.location.href) {
-    if (this.isHomePage(url)) {
-      this.cleanupPreviousButton();
-      this.homeHoverController?.start?.();
+    if (this.isYoutubeVideoPage(url)) {
+      this.homeHoverController?.stop?.();
+      this.startObservingButtonContainer();
       return;
     }
 
-    this.homeHoverController?.stop?.();
-
-    if (this.isYoutubeVideoPage(url)) {
-      this.startObservingButtonContainer();
-    }
+    this.cleanupPreviousButton();
+    this.homeHoverController?.start?.();
   }
 
   findSuitableButtonContainer() {

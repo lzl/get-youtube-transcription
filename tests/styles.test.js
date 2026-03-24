@@ -28,6 +28,14 @@ test('homepage preview transcript button keeps the native transparent feel and f
     css,
     /\.yt-home-transcript-player-button button:disabled svg\s*\{[\s\S]*animation:\s*spin 1s linear infinite\s*;/i
   );
+  assert.match(
+    css,
+    /\.ytInlinePlayerControlsTopRightControlsCircleButton\.yt-home-transcript-player-button[\s\S]*\.ytInlinePlayerControlsButtonIcon[\s\S]*width:\s*100%[\s\S]*height:\s*100%/i
+  );
+  assert.match(
+    css,
+    /\.ytInlinePlayerControlsTopRightControlsCircleButton\.yt-home-transcript-player-button[\s\S]*button\s*\{[\s\S]*width:\s*100%[\s\S]*height:\s*100%/i
+  );
 });
 
 test('homepage preview transcript button defines success, no_transcript, and error visual states', () => {
@@ -35,23 +43,23 @@ test('homepage preview transcript button defines success, no_transcript, and err
 
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\[data-state="success"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#86efac/i
+    /\.yt-home-transcript-player-button\[data-state="success"\]\s*button[\s\S]*background:\s*rgba\(22,\s*163,\s*74,\s*0\.14\)\s*;[\s\S]*color:\s*#166534[\s\S]*box-shadow:\s*inset 0 0 0 1px rgba\(22,\s*163,\s*74,\s*0\.18\)/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\[data-state="success"\] svg\s*\{[\s\S]*transform:\s*none/i
+    /\.yt-home-transcript-player-button\[data-state="success"\]\s*svg[\s\S]*transform:\s*scale\(0\.94\)/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\[data-state="no_transcript"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#fcd34d/i
+    /\.yt-home-transcript-player-button\[data-state="no_transcript"\]\s*button[\s\S]*background:\s*rgba\(180,\s*83,\s*9,\s*0\.14\)\s*;[\s\S]*color:\s*#9a3412[\s\S]*box-shadow:\s*inset 0 0 0 1px rgba\(180,\s*83,\s*9,\s*0\.18\)/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button button\[data-state="error"\]\s*\{[\s\S]*background:\s*transparent\s*;[\s\S]*color:\s*#fca5a5/i
+    /\.yt-home-transcript-player-button\[data-state="error"\]\s*button[\s\S]*background:\s*rgba\(220,\s*38,\s*38,\s*0\.14\)\s*;[\s\S]*color:\s*#b91c1c[\s\S]*box-shadow:\s*inset 0 0 0 1px rgba\(220,\s*38,\s*38,\s*0\.18\)/i
   );
   assert.match(
     css,
-    /\.yt-home-transcript-player-button\s+button\[data-state=\"success\"\]:hover[\s\S]*background:\s*transparent/i
+    /\.yt-home-transcript-player-button\[data-state="success"\]\s*button:hover[\s\S]*background:\s*rgba\(22,\s*163,\s*74,\s*0\.18\)/i
   );
   assert.match(
     css,

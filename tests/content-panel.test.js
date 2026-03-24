@@ -216,6 +216,31 @@ test('handlePageChange starts home hover controller on the home page', () => {
   assert.deepEqual(calls, ['cleanup-watch', 'start-home-hover']);
 });
 
+test('handlePageChange starts home hover controller on non-watch list pages', () => {
+  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+  const calls = [];
+
+  extension.startObservingButtonContainer = () => {
+    calls.push('start-watch');
+  };
+  extension.getVideoId = (url) => (url.includes('watch?v=') ? 'video-123' : null);
+  extension.cleanupPreviousButton = () => {
+    calls.push('cleanup-watch');
+  };
+  extension.homeHoverController = {
+    start() {
+      calls.push('start-home-hover');
+    },
+    stop() {
+      calls.push('stop-home-hover');
+    },
+  };
+
+  extension.handlePageChange('https://www.youtube.com/feed/subscriptions');
+
+  assert.deepEqual(calls, ['cleanup-watch', 'start-home-hover']);
+});
+
 test('handlePageChange stops home hover controller and resumes watch button handling on watch pages', () => {
   const extension = Object.create(YoutubeTranscriptionExtension.prototype);
   const calls = [];
