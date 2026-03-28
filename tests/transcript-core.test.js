@@ -84,6 +84,29 @@ test('resolvePageData prefers ytInitialData title without exposing transcript en
   assert.deepEqual(Object.keys(result).sort(), ['data', 'resolvedType', 'sourceKey', 'title']);
 });
 
+test('resolvePageData falls back to ytInitialPlayerResponse title when ytInitialData has no title', () => {
+  const html = `
+    <script>
+      var ytInitialData = {
+        "contents": {
+          "twoColumnWatchNextResults": {}
+        }
+      };
+      var ytInitialPlayerResponse = {
+        "videoDetails": {
+          "title": "The Leverage Problem No One is Talking About"
+        }
+      };
+    </script>
+  `;
+
+  const result = core.resolvePageData(html);
+
+  assert.equal(result.resolvedType, 'shorts');
+  assert.equal(result.sourceKey, 'ytInitialPlayerResponse');
+  assert.equal(result.title, 'The Leverage Problem No One is Talking About');
+});
+
 test('TranscriptCore no longer exports transcript endpoint helpers', () => {
   assert.deepEqual(Object.keys(core).sort(), [
     'buildTimedTextUrl',
