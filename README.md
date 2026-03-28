@@ -31,15 +31,14 @@ flowchart TD
     D --> E[User clicks Transcript]
     E --> F[Resolve the source URL]
     F --> G[Fetch the page HTML]
-    G --> H[Read YouTube page data]
-    H --> I[Try YouTube timedtext first]
+    G --> H[Read YouTube page data and INNERTUBE_API_KEY]
+    H --> I[Try InnerTube Android player captions first]
     I --> J{Transcript found?}
     J -- Yes --> K[Build title, URL, and timestamped transcript]
-    J -- No --> L[Open the YouTube transcript panel]
-    L --> M[Read transcript segments from the page]
-    M --> N{Transcript found?}
-    N -- Yes --> K
-    N -- No --> O[Show an error message]
+    J -- No --> L[Fallback to YouTube timedtext]
+    L --> M{Transcript found?}
+    M -- Yes --> K
+    M -- No --> O[Show an error message]
     K --> P[Copy text to clipboard]
     P --> Q[Show a success message]
 ```

@@ -16,22 +16,6 @@
     '#menu-container',
   ];
 
-  const TRANSCRIPT_PANEL_BUTTON_SELECTORS = [
-    'ytd-video-description-transcript-section-renderer #primary-button button',
-  ];
-
-  const DESCRIPTION_EXPAND_SELECTORS = [
-    'tp-yt-paper-button#expand',
-    '#description tp-yt-paper-button',
-    '[id="more"]:not([hidden])',
-    'ytd-text-inline-expander #expand',
-  ];
-
-  const TRANSCRIPT_SEGMENT_SELECTOR = [
-    'ytd-engagement-panel-section-list-renderer[target-id="PAmodern_transcript_view"] transcript-segment-view-model',
-    '#segments-container > ytd-transcript-segment-renderer',
-  ].join(', ');
-
   const DEFAULT_BUTTON_TITLE = 'Get video transcript with one click';
   const BUTTON_WIDTH_TRANSITION_MS = 220;
   const TRANSCRIPT_ICON_PATH = 'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
@@ -89,48 +73,6 @@
       disabled: false,
     },
   };
-
-  function extractModernTranscriptFallbackText(segmentNode, timestamp) {
-    let text = (segmentNode.textContent || '').trim();
-    const accessibilityLabel = segmentNode.querySelector('.ytwTranscriptSegmentViewModelTimestampA11yLabel')
-      ?.textContent?.trim();
-
-    if (timestamp && text.startsWith(timestamp)) {
-      text = text.slice(timestamp.length).trim();
-    }
-
-    if (accessibilityLabel && text.startsWith(accessibilityLabel)) {
-      text = text.slice(accessibilityLabel.length).trim();
-    }
-
-    return text;
-  }
-
-  function readTranscriptEntriesFromSegmentNodes(segmentNodes) {
-    return Array.from(segmentNodes)
-      .map((segmentNode) => {
-        const legacyTimestamp = segmentNode.querySelector('div.segment-timestamp')?.textContent?.trim();
-        const legacyText = segmentNode.querySelector('yt-formatted-string')?.textContent?.trim();
-
-        if (legacyTimestamp && legacyText) {
-          return [legacyTimestamp, legacyText];
-        }
-
-        const modernTimestamp = segmentNode.querySelector('.ytwTranscriptSegmentViewModelTimestamp')
-          ?.textContent?.trim();
-
-        if (!modernTimestamp) {
-          return null;
-        }
-
-        const modernText =
-          segmentNode.querySelector('span.yt-core-attributed-string[role="text"]')?.textContent?.trim() ||
-          extractModernTranscriptFallbackText(segmentNode, modernTimestamp);
-
-        return modernText ? [modernTimestamp, modernText] : null;
-      })
-      .filter((entry) => entry && entry[1]);
-  }
 
   function isValidWatchContainer(element) {
     const hasActionButtons = element.querySelector(
@@ -335,32 +277,6 @@
     });
   }
 
-  function waitForSelector(documentRef, selector, timeout = 3000, MutationObserverCtor = MutationObserver) {
-    return new Promise((resolve) => {
-      if (documentRef.querySelector(selector)) {
-        resolve(true);
-        return;
-      }
-
-      const observer = new MutationObserverCtor(() => {
-        if (documentRef.querySelector(selector)) {
-          observer.disconnect();
-          resolve(true);
-        }
-      });
-
-      observer.observe(documentRef.body, {
-        childList: true,
-        subtree: true,
-      });
-
-      setTimeout(() => {
-        observer.disconnect();
-        resolve(false);
-      }, timeout);
-    });
-  }
-
   function isElementVisible(windowRef, element) {
     if (!element) {
       return false;
@@ -379,30 +295,6 @@
     return element.offsetParent !== null;
   }
 
-  function findTranscriptPanelButton(documentRef, isVisible) {
-    for (const selector of TRANSCRIPT_PANEL_BUTTON_SELECTORS) {
-      const button = documentRef.querySelector(selector);
-
-      if (button && isVisible(button)) {
-        return button;
-      }
-    }
-
-    return null;
-  }
-
-  async function expandVideoDescription(documentRef, isVisible, wait) {
-    for (const selector of DESCRIPTION_EXPAND_SELECTORS) {
-      const button = documentRef.querySelector(selector);
-
-      if (button && isVisible(button)) {
-        button.click();
-        await wait(300);
-        return;
-      }
-    }
-  }
-
   function getPageTitle(documentRef) {
     return (
       documentRef.querySelector('h1.ytd-watch-metadata yt-formatted-string')?.textContent?.trim() ||
@@ -415,19 +307,13 @@
   return {
     DEFAULT_BUTTON_TITLE,
     TRANSCRIPT_ICON_PATH,
-    TRANSCRIPT_SEGMENT_SELECTOR,
     createTranscriptButton,
-    expandVideoDescription,
-    extractModernTranscriptFallbackText,
     findSuitableButtonContainer,
-    findTranscriptPanelButton,
     getPageTitle,
     isElementVisible,
     isValidWatchContainer,
-    readTranscriptEntriesFromSegmentNodes,
     updateHoverButtonState,
     updateButtonState,
     waitForMilliseconds,
-    waitForSelector,
   };
 });

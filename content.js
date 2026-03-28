@@ -58,14 +58,6 @@ const LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS = [
 ];
 
 class YoutubeTranscriptionExtension {
-  static readTranscriptEntriesFromSegmentNodes(segmentNodes) {
-    return getTranscriptDomApi().readTranscriptEntriesFromSegmentNodes(segmentNodes);
-  }
-
-  static extractModernTranscriptFallbackText(segmentNode, timestamp) {
-    return getTranscriptDomApi().extractModernTranscriptFallbackText(segmentNode, timestamp);
-  }
-
   constructor() {
     this.transcriptButton = null;
     this.isExtracting = false;
@@ -93,16 +85,12 @@ class YoutubeTranscriptionExtension {
       navigatorRef: navigator,
       performanceRef: performance,
       potTokens: this.potTokens,
-      readTranscriptEntriesFromSegmentNodes: YoutubeTranscriptionExtension.readTranscriptEntriesFromSegmentNodes,
       resolvePageData: (html) => this.core.resolvePageData(html),
       getVideoIdFromUrl: (url) => this.core.getVideoIdFromUrl(url),
       getCurrentUrl: () => window.location.href,
       getPageTitle: () => this.getPageTitle(),
       waitForMilliseconds: (milliseconds) => this.waitForMilliseconds(milliseconds),
-      waitForSelector: (selector, timeout) => this.waitForSelector(selector, timeout),
       findCaptionToggleButton: () => this.findCaptionToggleButton(),
-      findTranscriptPanelButton: async () => this.findTranscriptPanelButton(),
-      transcriptSegmentSelector: this.dom.TRANSCRIPT_SEGMENT_SELECTOR,
     });
 
     const listHoverActionsApi = getListHoverActionsApi();
@@ -342,7 +330,6 @@ class YoutubeTranscriptionExtension {
 
   async handleListHoverTranscriptButtonClick({ buttonElement, watchUrl }) {
     return this.runTranscriptAction({
-      allowPanelFallback: false,
       button: buttonElement,
       displayUrl: watchUrl,
       sourceUrl: watchUrl,
@@ -351,7 +338,6 @@ class YoutubeTranscriptionExtension {
   }
 
   async runTranscriptAction({
-    allowPanelFallback,
     button = null,
     displayUrl,
     sourceUrl,
@@ -369,7 +355,6 @@ class YoutubeTranscriptionExtension {
 
     try {
       const transcriptPackage = await this.extractTranscriptPackage({
-        allowPanelFallback,
         displayUrl,
         sourceUrl,
       });
@@ -404,25 +389,12 @@ class YoutubeTranscriptionExtension {
     return this.workflow.fetchTimedTextTranscript(playerResponse, videoId);
   }
 
+  async fetchInnerTubeTranscript(html, videoId) {
+    return this.workflow.fetchInnerTubeTranscript(html, videoId);
+  }
+
   async capturePotToken(videoId) {
     return this.workflow.capturePotToken(videoId);
-  }
-
-  async fetchTranscriptFromPanel() {
-    return this.workflow.fetchTranscriptFromPanel();
-  }
-
-  async findTranscriptPanelButton() {
-    await this.expandVideoDescription();
-    return this.dom.findTranscriptPanelButton(document, (element) => this.isElementVisible(element));
-  }
-
-  async expandVideoDescription() {
-    return this.dom.expandVideoDescription(
-      document,
-      (element) => this.isElementVisible(element),
-      (milliseconds) => this.waitForMilliseconds(milliseconds)
-    );
   }
 
   formatTranscriptText(entries) {
@@ -475,10 +447,6 @@ class YoutubeTranscriptionExtension {
 
   waitForMilliseconds(milliseconds) {
     return this.dom.waitForMilliseconds(milliseconds);
-  }
-
-  waitForSelector(selector, timeout = 3000) {
-    return this.dom.waitForSelector(document, selector, timeout);
   }
 
   isElementVisible(element) {

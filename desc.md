@@ -26,7 +26,7 @@ Perfect for:
 - Anyone who wants quick access to video content without privacy concerns
 
 How it works:
-The extension injects a button on YouTube pages, reads YouTube's own embedded page data, and requests transcript data directly from YouTube when needed. If the direct subtitle endpoint is unavailable, it falls back to YouTube's transcript panel.
+The extension injects a button on YouTube pages, reads YouTube's own embedded page data, and requests transcript data directly from YouTube when needed. It tries YouTube's InnerTube Android caption flow first, then falls back to the timedtext endpoint if needed.
 
 Technical transparency:
 - Manifest V3 compliant

@@ -142,6 +142,51 @@
     return playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks?.[0]?.baseUrl || null;
   }
 
+  function decodeJsonStringValue(value) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    try {
+      return JSON.parse(`"${value}"`);
+    } catch (error) {
+      return value;
+    }
+  }
+
+  function getInnertubeApiKey(html) {
+    if (typeof html !== 'string' || !html) {
+      return null;
+    }
+
+    const patterns = [
+      /"INNERTUBE_API_KEY":"([^"\\]*(?:\\.[^"\\]*)*)"/,
+      /"innertubeApiKey":"([^"\\]*(?:\\.[^"\\]*)*)"/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+
+      if (match?.[1]) {
+        return decodeJsonStringValue(match[1]);
+      }
+    }
+
+    return null;
+  }
+
+  function selectCaptionTrack(captionTracks) {
+    if (!Array.isArray(captionTracks) || captionTracks.length === 0) {
+      return null;
+    }
+
+    return (
+      captionTracks.find((track) => track?.baseUrl && track.kind !== 'asr') ||
+      captionTracks.find((track) => track?.baseUrl) ||
+      null
+    );
+  }
+
   function formatMillisecondsAsTimestamp(milliseconds) {
     const totalSeconds = Math.floor(milliseconds / 1000);
     const hours = Math.floor(totalSeconds / 3600);
@@ -157,29 +202,6 @@
 
   function normalizeText(text) {
     return (text || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  function readPanelTranscriptSegment(segment) {
-    const renderer = segment?.transcriptSegmentRenderer;
-
-    if (!renderer) {
-      return null;
-    }
-
-    return [
-      renderer.startTimeText?.simpleText || '',
-      normalizeText((renderer.snippet?.runs || []).map((run) => run.text || '').join('')),
-    ];
-  }
-
-  function readModernTranscriptSegment(segment) {
-    const renderer = segment?.transcriptSegmentViewModel;
-
-    if (!renderer) {
-      return null;
-    }
-
-    return [renderer.timestamp || '', normalizeText(renderer.simpleText)];
   }
 
   function readJson3TranscriptSegment(segment) {
@@ -200,13 +222,84 @@
 
     return segments
       .map((segment) => {
-        return (
-          readPanelTranscriptSegment(segment) ||
-          readModernTranscriptSegment(segment) ||
-          readJson3TranscriptSegment(segment)
-        );
+        return readJson3TranscriptSegment(segment);
       })
       .filter((entry) => entry && entry[1]);
+  }
+
+  function getXmlAttribute(tag, name) {
+    const needle = `${name}="`;
+    const start = tag.indexOf(needle);
+
+    if (start === -1) {
+      return '';
+    }
+
+    const valueStart = start + needle.length;
+    const valueEnd = tag.indexOf('"', valueStart);
+
+    if (valueEnd === -1) {
+      return '';
+    }
+
+    return tag.slice(valueStart, valueEnd);
+  }
+
+  function decodeHtmlEntities(text) {
+    return String(text || '')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'");
+  }
+
+  function parseCaptionXml(xml) {
+    if (typeof xml !== 'string' || !xml) {
+      return [];
+    }
+
+    const isFormat3 = xml.includes('<p ');
+    const marker = isFormat3 ? '<p ' : '<text ';
+    const endMarker = isFormat3 ? '</p>' : '</text>';
+    const results = [];
+    let position = 0;
+
+    while (true) {
+      const tagStart = xml.indexOf(marker, position);
+
+      if (tagStart === -1) {
+        break;
+      }
+
+      let contentStart = xml.indexOf('>', tagStart);
+
+      if (contentStart === -1) {
+        break;
+      }
+
+      contentStart += 1;
+      const tagEnd = xml.indexOf(endMarker, contentStart);
+
+      if (tagEnd === -1) {
+        break;
+      }
+
+      const attributes = xml.slice(tagStart + marker.length, contentStart - 1);
+      const content = xml.slice(contentStart, tagEnd);
+      const startMilliseconds = isFormat3
+        ? parseFloat(getXmlAttribute(attributes, 't')) || 0
+        : (parseFloat(getXmlAttribute(attributes, 'start')) || 0) * 1000;
+      const text = normalizeText(decodeHtmlEntities(content.replace(/<[^>]+>/g, '')));
+
+      if (text) {
+        results.push([formatMillisecondsAsTimestamp(startMilliseconds), text]);
+      }
+
+      position = tagEnd + endMarker.length;
+    }
+
+    return results;
   }
 
   function buildTimedTextUrl(baseUrl, potToken) {
@@ -240,9 +333,12 @@
     extractJsonBlob,
     formatMillisecondsAsTimestamp,
     getCaptionBaseUrl,
+    getInnertubeApiKey,
     getTitleFromData,
     getVideoIdFromUrl,
     normalizeTranscriptSegments,
+    parseCaptionXml,
     resolvePageData,
+    selectCaptionTrack,
   };
 });

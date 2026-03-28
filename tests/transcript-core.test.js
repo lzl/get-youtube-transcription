@@ -90,24 +90,39 @@ test('TranscriptCore no longer exports transcript endpoint helpers', () => {
     'extractJsonBlob',
     'formatMillisecondsAsTimestamp',
     'getCaptionBaseUrl',
+    'getInnertubeApiKey',
     'getTitleFromData',
     'getVideoIdFromUrl',
     'normalizeTranscriptSegments',
+    'parseCaptionXml',
     'resolvePageData',
+    'selectCaptionTrack',
   ]);
 });
 
-test('normalizeTranscriptSegments supports transcript panel segments and json3 events', () => {
-  assert.equal(typeof core.normalizeTranscriptSegments, 'function');
+test('getInnertubeApiKey extracts the embedded YouTube InnerTube API key', () => {
+  assert.equal(typeof core.getInnertubeApiKey, 'function');
 
-  const panelSegments = [
-    {
-      transcriptSegmentRenderer: {
-        startTimeText: { simpleText: '0:03' },
-        snippet: { runs: [{ text: 'hello' }, { text: ' world' }] },
-      },
-    },
-  ];
+  const html = `
+    <script>
+      ytcfg.set({"INNERTUBE_API_KEY":"api-key-123","INNERTUBE_CONTEXT_CLIENT_NAME":1});
+    </script>
+  `;
+
+  assert.equal(core.getInnertubeApiKey(html), 'api-key-123');
+});
+
+test('selectCaptionTrack prefers manual tracks over ASR tracks', () => {
+  assert.equal(typeof core.selectCaptionTrack, 'function');
+
+  assert.deepEqual(core.selectCaptionTrack([
+    { languageCode: 'en', kind: 'asr', baseUrl: 'https://example.com/asr' },
+    { languageCode: 'en', baseUrl: 'https://example.com/manual' },
+  ]), { languageCode: 'en', baseUrl: 'https://example.com/manual' });
+});
+
+test('normalizeTranscriptSegments supports json3 events', () => {
+  assert.equal(typeof core.normalizeTranscriptSegments, 'function');
 
   const json3Events = [
     {
@@ -116,27 +131,23 @@ test('normalizeTranscriptSegments supports transcript panel segments and json3 e
     },
   ];
 
-  assert.deepEqual(core.normalizeTranscriptSegments(panelSegments), [
-    ['0:03', 'hello world'],
-  ]);
   assert.deepEqual(core.normalizeTranscriptSegments(json3Events), [
     ['0:12', 'first line second line'],
   ]);
 });
 
-test('normalizeTranscriptSegments supports modern transcriptSegmentViewModel items', () => {
-  const modernSegments = [
-    {
-      transcriptSegmentViewModel: {
-        timestamp: '0:00',
-        simpleText: 'hello modern transcript',
-      },
-    },
-  ];
+test('parseCaptionXml supports legacy text XML and srv3 paragraph XML', () => {
+  assert.equal(typeof core.parseCaptionXml, 'function');
 
-  assert.deepEqual(core.normalizeTranscriptSegments(modernSegments), [
-    ['0:00', 'hello modern transcript'],
-  ]);
+  assert.deepEqual(
+    core.parseCaptionXml('<transcript><text start="3.0" dur="1.5">hello &amp; world</text></transcript>'),
+    [['0:03', 'hello & world']]
+  );
+
+  assert.deepEqual(
+    core.parseCaptionXml('<timedtext><body><p t="12000" d="800"><s>first</s><s> line</s></p></body></timedtext>'),
+    [['0:12', 'first line']]
+  );
 });
 
 test('buildTimedTextUrl appends json3 format and optional pot token', () => {
