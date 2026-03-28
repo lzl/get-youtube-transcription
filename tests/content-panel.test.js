@@ -248,6 +248,41 @@ test('attemptToAddButton injects the shorts transcript action into the shorts ac
   }
 });
 
+test('attemptToAddButton delegates shorts action placement to the dom helper when available', () => {
+  const insertCalls = [];
+  const shortsButton = { id: 'shorts-button' };
+  const shortsRoot = { id: 'shorts-root' };
+  const actionBar = { id: 'shorts-bar' };
+  const originalDocument = global.document;
+  global.document = {};
+
+  try {
+    const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+    extension.transcriptButton = null;
+    extension.transcriptButtonRoot = null;
+    extension.findSuitableShortsActionBar = () => actionBar;
+    extension.dom = {
+      createShortsTranscriptButton() {
+        return {
+          root: shortsRoot,
+          button: shortsButton,
+        };
+      },
+      insertShortsTranscriptButton(container, root) {
+        insertCalls.push({ container, root });
+      },
+    };
+
+    extension.attemptToAddButton('shorts');
+
+    assert.deepEqual(insertCalls, [{ container: actionBar, root: shortsRoot }]);
+    assert.equal(extension.transcriptButton, shortsButton);
+    assert.equal(extension.transcriptButtonRoot, shortsRoot);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
 test('updateButtonState routes main shorts buttons through the shorts updater', () => {
   const extension = Object.create(YoutubeTranscriptionExtension.prototype);
   const updates = [];

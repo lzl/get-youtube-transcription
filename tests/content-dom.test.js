@@ -231,6 +231,25 @@ function createTreeElement(tagName, options = {}) {
       this.children.push(child);
       return child;
     },
+    insertBefore(child, referenceNode) {
+      child.parentNode = this;
+      child.parentElement = this;
+
+      if (!referenceNode) {
+        this.children.push(child);
+        return child;
+      }
+
+      const referenceIndex = this.children.indexOf(referenceNode);
+
+      if (referenceIndex === -1) {
+        this.children.push(child);
+        return child;
+      }
+
+      this.children.splice(referenceIndex, 0, child);
+      return child;
+    },
     setAttribute(name, value) {
       this.attributes[name] = value;
 
@@ -423,31 +442,57 @@ function createShortsActionBarFixture() {
   const actionBar = createTreeElement('reel-action-bar-view-model', {
     className: 'ytwReelActionBarViewModelHostDesktop',
   });
-  const actionRoot = createTreeElement('button-view-model', {
-    className: 'ytSpecButtonViewModelHost ytwReelActionBarViewModelHostDesktopActionButton',
-  });
-  const labelWrapper = createTreeElement('label', {
-    className: 'yt-spec-button-shape-with-label',
-  });
-  const button = createTreeElement('button', {
-    className: 'yt-spec-button-shape-next',
+
+  const createShortsAction = ({ ariaLabel, labelText }) => {
+    const actionRoot = createTreeElement('button-view-model', {
+      className: 'ytSpecButtonViewModelHost ytwReelActionBarViewModelHostDesktopActionButton',
+    });
+    const labelWrapper = createTreeElement('label', {
+      className: 'yt-spec-button-shape-with-label',
+    });
+    const button = createTreeElement('button', {
+      className: 'yt-spec-button-shape-next',
+      ariaLabel,
+    });
+    const icon = createTreeElement('svg');
+    const path = createTreeElement('path', {
+      attributes: { d: 'initial' },
+    });
+    const countLabel = createTreeElement('div', {
+      className: 'yt-spec-button-shape-with-label__label',
+      textContent: labelText,
+    });
+
+    icon.appendChild(path);
+    button.appendChild(icon);
+    labelWrapper.appendChild(button);
+    labelWrapper.appendChild(countLabel);
+    actionRoot.appendChild(labelWrapper);
+
+    return {
+      actionRoot,
+      button,
+      countLabel,
+      path,
+    };
+  };
+
+  const commentsAction = createShortsAction({
     ariaLabel: 'View 40 comments',
+    labelText: '40',
   });
-  const icon = createTreeElement('svg');
-  const path = createTreeElement('path', {
-    attributes: { d: 'initial' },
+  const shareAction = createShortsAction({
+    ariaLabel: 'Share',
+    labelText: 'Share',
   });
-  const countLabel = createTreeElement('div', {
-    className: 'yt-spec-button-shape-with-label__label',
-    textContent: '40',
+  const remixAction = createShortsAction({
+    ariaLabel: 'Remix',
+    labelText: 'Remix',
   });
 
-  icon.appendChild(path);
-  button.appendChild(icon);
-  labelWrapper.appendChild(button);
-  labelWrapper.appendChild(countLabel);
-  actionRoot.appendChild(labelWrapper);
-  actionBar.appendChild(actionRoot);
+  actionBar.appendChild(commentsAction.actionRoot);
+  actionBar.appendChild(shareAction.actionRoot);
+  actionBar.appendChild(remixAction.actionRoot);
   shortsContainer.appendChild(actionBar);
 
   const documentRef = {
@@ -466,11 +511,13 @@ function createShortsActionBarFixture() {
 
   return {
     actionBar,
-    actionRoot,
-    button,
-    countLabel,
+    actionRoot: commentsAction.actionRoot,
+    button: commentsAction.button,
+    countLabel: commentsAction.countLabel,
     documentRef,
-    path,
+    path: commentsAction.path,
+    remixActionRoot: remixAction.actionRoot,
+    shareActionRoot: shareAction.actionRoot,
     shortsContainer,
   };
 }
@@ -545,6 +592,20 @@ test('content-dom creates a native-looking shorts transcript action', () => {
   assert.equal(result.button.title, 'Transcript');
   assert.equal(result.root.querySelector('.yt-spec-button-shape-with-label__label').textContent, 'Transcript');
   assert.equal(result.root.querySelector('svg path').getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
+});
+
+test('content-dom inserts the shorts transcript action after share and before remix', () => {
+  const { actionBar, shareActionRoot, remixActionRoot } = createShortsActionBarFixture();
+  const result = dom.createShortsTranscriptButton({}, actionBar, () => {});
+
+  dom.insertShortsTranscriptButton(actionBar, result.root);
+
+  const transcriptIndex = actionBar.children.indexOf(result.root);
+  const shareIndex = actionBar.children.indexOf(shareActionRoot);
+  const remixIndex = actionBar.children.indexOf(remixActionRoot);
+
+  assert.equal(transcriptIndex, shareIndex + 1);
+  assert.equal(remixIndex, transcriptIndex + 1);
 });
 
 test('content-dom updates shorts button state without changing the visible label', () => {

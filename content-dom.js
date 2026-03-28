@@ -357,6 +357,52 @@
     return { root, button };
   }
 
+  function getShortsActionInsertBeforeNode(actionBar) {
+    const actionRoots = Array.from(actionBar?.children || []).filter((child) => child?.tagName === 'BUTTON-VIEW-MODEL');
+
+    if (actionRoots.length === 0) {
+      return null;
+    }
+
+    const remixAction =
+      actionRoots.find((actionRoot) => {
+        const button = actionRoot.querySelector?.('button');
+        const label = actionRoot.querySelector?.('.yt-spec-button-shape-with-label__label');
+        const signals = [
+          label?.textContent,
+          button?.getAttribute?.('aria-label'),
+          button?.getAttribute?.('title'),
+          button?.title,
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        return /\bremix\b/i.test(signals);
+      }) || null;
+
+    if (remixAction) {
+      return remixAction;
+    }
+
+    return actionRoots.length > 1 ? actionRoots[actionRoots.length - 1] : null;
+  }
+
+  function insertShortsTranscriptButton(actionBar, root) {
+    if (!actionBar || !root) {
+      return false;
+    }
+
+    const insertBeforeNode = getShortsActionInsertBeforeNode(actionBar);
+
+    if (insertBeforeNode && typeof actionBar.insertBefore === 'function') {
+      actionBar.insertBefore(root, insertBeforeNode);
+      return true;
+    }
+
+    actionBar.appendChild?.(root);
+    return true;
+  }
+
   function updateShortsButtonState(button, state) {
     if (!button) {
       return;
@@ -436,6 +482,7 @@
     findSuitableButtonContainer,
     findSuitableShortsActionBar,
     getPageTitle,
+    insertShortsTranscriptButton,
     isElementVisible,
     isValidWatchContainer,
     updateHoverButtonState,

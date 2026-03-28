@@ -350,7 +350,11 @@ class YoutubeTranscriptionExtension {
       }
 
       shortsButton = shortsAction.button;
-      targetContainer.appendChild(shortsAction.root);
+      if (typeof this.dom.insertShortsTranscriptButton === 'function') {
+        this.dom.insertShortsTranscriptButton(targetContainer, shortsAction.root);
+      } else {
+        targetContainer.appendChild(shortsAction.root);
+      }
       this.transcriptButton = shortsAction.button;
       this.transcriptButtonRoot = shortsAction.root;
       return;
