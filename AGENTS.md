@@ -17,6 +17,14 @@ Automated regression coverage runs with:
 node --test
 ```
 
+## Git and Commits
+
+When you are asked to create a commit, use a conventional commit message.
+
+- Prefer standard prefixes such as `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, or `perf:`.
+- Keep the subject concise and specific to the actual change.
+- Split unrelated work into separate commits instead of combining them under one message.
+
 ## Default Testing Strategy
 
 Prefer local inspection and `node --test` first.
