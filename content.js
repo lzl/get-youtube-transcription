@@ -1,49 +1,29 @@
-function getTranscriptCoreApi() {
-  if (typeof window !== 'undefined' && window.TranscriptCore) {
-    return window.TranscriptCore;
+function getApi(windowKey, modulePath) {
+  if (typeof window !== 'undefined' && window[windowKey]) {
+    return window[windowKey];
   }
 
   if (typeof require === 'function') {
-    return require('./transcript-core.js');
+    return require(modulePath);
   }
 
   return null;
+}
+
+function getTranscriptCoreApi() {
+  return getApi('TranscriptCore', './transcript-core.js');
 }
 
 function getTranscriptDomApi() {
-  if (typeof window !== 'undefined' && window.TranscriptContentDom) {
-    return window.TranscriptContentDom;
-  }
-
-  if (typeof require === 'function') {
-    return require('./content-dom.js');
-  }
-
-  return null;
+  return getApi('TranscriptContentDom', './content-dom.js');
 }
 
 function getTranscriptWorkflowApi() {
-  if (typeof window !== 'undefined' && window.TranscriptContentWorkflow) {
-    return window.TranscriptContentWorkflow;
-  }
-
-  if (typeof require === 'function') {
-    return require('./content-transcript.js');
-  }
-
-  return null;
+  return getApi('TranscriptContentWorkflow', './content-transcript.js');
 }
 
 function getListHoverActionsApi() {
-  if (typeof window !== 'undefined' && window.TranscriptListHoverActions) {
-    return window.TranscriptListHoverActions;
-  }
-
-  if (typeof require === 'function') {
-    return require('./content-hover-actions.js');
-  }
-
-  return null;
+  return getApi('TranscriptListHoverActions', './content-hover-actions.js');
 }
 
 const SUCCESS_BUTTON_FEEDBACK_MS = 1800;
@@ -155,19 +135,21 @@ class YoutubeTranscriptionExtension {
 
     this.clearButtonStateResetTimeout();
 
-    const removableRoot =
-      this.transcriptButtonRoot && document.contains(this.transcriptButtonRoot)
-        ? this.transcriptButtonRoot
-        : this.transcriptButton && document.contains(this.transcriptButton)
-          ? this.transcriptButton
-          : null;
+    const removableRoot = this.getButtonRoot();
 
-    if (removableRoot) {
+    if (removableRoot && document.contains(removableRoot)) {
       removableRoot.remove();
     }
 
     this.transcriptButton = null;
     this.transcriptButtonRoot = null;
+  }
+
+  getButtonRoot() {
+    if (this.transcriptButtonRoot && document.contains(this.transcriptButtonRoot)) {
+      return this.transcriptButtonRoot;
+    }
+    return this.transcriptButton;
   }
 
   startObservingButtonContainer(surface = this.getPageSurface()) {
@@ -189,10 +171,7 @@ class YoutubeTranscriptionExtension {
         return;
       }
 
-      const buttonRoot =
-        this.transcriptButtonRoot && document.contains(this.transcriptButtonRoot)
-          ? this.transcriptButtonRoot
-          : this.transcriptButton;
+      const buttonRoot = this.getButtonRoot();
 
       if (!buttonRoot || !document.contains(buttonRoot)) {
         this.transcriptButton = null;
@@ -307,56 +286,24 @@ class YoutubeTranscriptionExtension {
       return;
     }
 
-    if (surface === 'watch_like') {
-      const container = this.findSuitableButtonContainer();
+    const container = surface === 'watch_like'
+      ? this.findSuitableButtonContainer()
+      : this.findSuitableShortsActionBar();
 
-      if (!container) {
-        return;
-      }
-
+    if (container) {
       this.createAndInsertButton(container, surface);
-      return;
-    }
-
-    if (surface === 'shorts') {
-      const actionBar = this.findSuitableShortsActionBar();
-
-      if (!actionBar) {
-        return;
-      }
-
-      this.createAndInsertButton(actionBar, surface);
     }
   }
 
   createAndInsertButton(targetContainer, surface = 'watch_like') {
-    const buttonRoot =
-      this.transcriptButtonRoot && document.contains(this.transcriptButtonRoot)
-        ? this.transcriptButtonRoot
-        : this.transcriptButton;
+    const buttonRoot = this.getButtonRoot();
 
     if (buttonRoot && document.contains(buttonRoot)) {
       return;
     }
 
     if (surface === 'shorts') {
-      let shortsButton = null;
-      const shortsAction = this.dom.createShortsTranscriptButton(document, targetContainer, () => {
-        void this.handleTranscriptButtonClick(shortsButton);
-      });
-
-      if (!shortsAction?.root || !shortsAction.button) {
-        return;
-      }
-
-      shortsButton = shortsAction.button;
-      if (typeof this.dom.insertShortsTranscriptButton === 'function') {
-        this.dom.insertShortsTranscriptButton(targetContainer, shortsAction.root);
-      } else {
-        targetContainer.appendChild(shortsAction.root);
-      }
-      this.transcriptButton = shortsAction.button;
-      this.transcriptButtonRoot = shortsAction.root;
+      this.createAndInsertShortsButton(targetContainer);
       return;
     }
 
@@ -367,6 +314,26 @@ class YoutubeTranscriptionExtension {
     targetContainer.appendChild(button);
     this.transcriptButton = button;
     this.transcriptButtonRoot = button;
+  }
+
+  createAndInsertShortsButton(targetContainer) {
+    let shortsButton = null;
+    const shortsAction = this.dom.createShortsTranscriptButton(document, targetContainer, () => {
+      void this.handleTranscriptButtonClick(shortsButton);
+    });
+
+    if (!shortsAction?.root || !shortsAction.button) {
+      return;
+    }
+
+    shortsButton = shortsAction.button;
+    if (typeof this.dom.insertShortsTranscriptButton === 'function') {
+      this.dom.insertShortsTranscriptButton(targetContainer, shortsAction.root);
+    } else {
+      targetContainer.appendChild(shortsAction.root);
+    }
+    this.transcriptButton = shortsAction.button;
+    this.transcriptButtonRoot = shortsAction.root;
   }
 
   isMainActionTarget(button) {
