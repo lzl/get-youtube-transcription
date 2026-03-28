@@ -6,8 +6,8 @@ const { createTranscriptWorkflow } = require('../content-transcript.js');
 function createWorkflow(overrides = {}) {
   return createTranscriptWorkflow({
     fetchHtml: async () => '<html></html>',
+    fetchInnerTubeTranscript: async () => [],
     fetchTimedTextTranscript: async () => [],
-    fetchTranscriptFromPanel: async () => [],
     extractPlayerResponse: () => null,
     resolvePageData: () => ({ title: 'Resolved Title' }),
     getVideoIdFromUrl: () => 'video-123',
@@ -30,24 +30,30 @@ test('createTranscriptWorkflow keeps the current URL and does not rewrite shorts
   );
 });
 
-test('createTranscriptWorkflow prefers timedtext entries and falls back to panel entries', async () => {
+test('createTranscriptWorkflow prefers InnerTube entries and falls back to timedtext entries', async () => {
+  let timedTextCalls = 0;
+  const innerTubeWorkflow = createWorkflow({
+    fetchInnerTubeTranscript: async () => [['0:01', 'InnerTube line']],
+    fetchTimedTextTranscript: async () => {
+      timedTextCalls += 1;
+      return [['0:02', 'Timed text line']];
+    },
+  });
+
+  const innerTubePackage = await innerTubeWorkflow.extractTranscriptPackage();
+  assert.deepEqual(innerTubePackage.entries, [['0:01', 'InnerTube line']]);
+  assert.equal(innerTubePackage.body, '0:01: InnerTube line');
+  assert.equal(timedTextCalls, 0);
+
   const timedTextWorkflow = createWorkflow({
     extractPlayerResponse: () => ({ id: 'player-response' }),
-    fetchTimedTextTranscript: async () => [['0:01', 'Timed text line']],
-    fetchTranscriptFromPanel: async () => [['0:02', 'Panel line']],
+    fetchInnerTubeTranscript: async () => [],
+    fetchTimedTextTranscript: async () => [['0:02', 'Timed text line']],
   });
 
   const timedTextPackage = await timedTextWorkflow.extractTranscriptPackage();
-  assert.deepEqual(timedTextPackage.entries, [['0:01', 'Timed text line']]);
-  assert.equal(timedTextPackage.body, '0:01: Timed text line');
-
-  const panelWorkflow = createWorkflow({
-    fetchTranscriptFromPanel: async () => [['0:02', 'Panel line']],
-  });
-
-  const panelPackage = await panelWorkflow.extractTranscriptPackage();
-  assert.deepEqual(panelPackage.entries, [['0:02', 'Panel line']]);
-  assert.equal(panelPackage.body, '0:02: Panel line');
+  assert.deepEqual(timedTextPackage.entries, [['0:02', 'Timed text line']]);
+  assert.equal(timedTextPackage.body, '0:02: Timed text line');
 });
 
 test('createTranscriptWorkflow supports per-run sourceUrl and displayUrl overrides', async () => {
@@ -76,26 +82,19 @@ test('createTranscriptWorkflow supports per-run sourceUrl and displayUrl overrid
   assert.equal(transcriptPackage.body, 'id:source-123: Timed text line');
 });
 
-test('createTranscriptWorkflow skips transcript panel fallback when allowPanelFallback is false', async () => {
-  let panelFallbackCalls = 0;
+test('createTranscriptWorkflow throws when InnerTube and timedtext both return no entries', async () => {
   const workflow = createWorkflow({
+    fetchInnerTubeTranscript: async () => [],
     fetchTimedTextTranscript: async () => [],
-    fetchTranscriptFromPanel: async () => {
-      panelFallbackCalls += 1;
-      return [['0:02', 'Panel line']];
-    },
   });
 
   await assert.rejects(
     workflow.extractTranscriptPackage({
       sourceUrl: 'https://www.youtube.com/watch?v=video-123',
       displayUrl: 'https://www.youtube.com/watch?v=video-123',
-      allowPanelFallback: false,
     }),
     /No captions found/
   );
-
-  assert.equal(panelFallbackCalls, 0);
 });
 
 test('createTranscriptWorkflow capturePotToken uses the injected caption toggle finder', async () => {

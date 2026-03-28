@@ -32,7 +32,6 @@
     const sourceUrl = options?.sourceUrl || getTranscriptSourceUrl(currentUrl, getVideoIdFromUrl);
 
     return {
-      allowPanelFallback: options?.allowPanelFallback !== false,
       currentUrl,
       displayUrl: options?.displayUrl || currentUrl,
       sourceUrl,
@@ -46,26 +45,22 @@
       documentRef,
       extractPlayerResponse,
       fetchHtml,
+      fetchInnerTubeTranscript,
       fetchImpl = typeof fetch === 'function' ? fetch.bind(globalRoot) : null,
       fetchTimedTextTranscript,
-      fetchTranscriptFromPanel,
       findCaptionToggleButton,
-      findTranscriptPanelButton,
       getCurrentUrl = () => '',
       getPageTitle = () => 'Unknown Title',
       getVideoIdFromUrl,
       navigatorRef,
       performanceRef,
       potTokens = new Map(),
-      readTranscriptEntriesFromSegmentNodes,
       resolvePageData,
-      transcriptSegmentSelector,
       waitForMilliseconds = (milliseconds) => {
         return new Promise((resolve) => {
           setTimeout(resolve, milliseconds);
         });
       },
-      waitForSelector,
     } = overrides;
 
     async function fetchHtmlImpl(url) {
@@ -160,6 +155,65 @@
       }
     }
 
+    async function fetchInnerTubeTranscriptImpl(html, videoId) {
+      if (fetchInnerTubeTranscript) {
+        return fetchInnerTubeTranscript(html, videoId);
+      }
+
+      if (!fetchImpl || !videoId) {
+        return [];
+      }
+
+      const apiKey = TranscriptCore.getInnertubeApiKey(html);
+
+      if (!apiKey) {
+        return [];
+      }
+
+      try {
+        const playerResponse = await fetchImpl(`/youtubei/v1/player?key=${encodeURIComponent(apiKey)}&prettyPrint=false`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context: {
+              client: {
+                clientName: 'ANDROID',
+                clientVersion: '20.10.38',
+              },
+            },
+            videoId,
+          }),
+        });
+
+        if (!playerResponse.ok) {
+          return [];
+        }
+
+        const payload = await playerResponse.json();
+        const track = TranscriptCore.selectCaptionTrack(
+          payload?.captions?.playerCaptionsTracklistRenderer?.captionTracks
+        );
+
+        if (!track?.baseUrl) {
+          return [];
+        }
+
+        const transcriptResponse = await fetchImpl(track.baseUrl, {
+          credentials: 'same-origin',
+        });
+
+        if (!transcriptResponse.ok) {
+          return [];
+        }
+
+        return TranscriptCore.parseCaptionXml(await transcriptResponse.text());
+      } catch (error) {
+        console.warn('InnerTube transcript fetch failed:', error);
+        return [];
+      }
+    }
+
     async function fetchTimedTextTranscriptImpl(playerResponse, videoId) {
       if (fetchTimedTextTranscript) {
         return fetchTimedTextTranscript(playerResponse, videoId);
@@ -195,30 +249,6 @@
       }
     }
 
-    async function fetchTranscriptFromPanelImpl() {
-      if (fetchTranscriptFromPanel) {
-        return fetchTranscriptFromPanel();
-      }
-
-      const transcriptButton = await findTranscriptPanelButton?.();
-
-      if (!transcriptButton || !transcriptSegmentSelector || !documentRef) {
-        return [];
-      }
-
-      transcriptButton.click();
-
-      const hasSegments = await waitForSelector(transcriptSegmentSelector, 3000);
-
-      if (!hasSegments) {
-        return [];
-      }
-
-      await waitForMilliseconds(300);
-
-      return readTranscriptEntriesFromSegmentNodes(documentRef.querySelectorAll(transcriptSegmentSelector));
-    }
-
     async function extractTranscriptPackage(options = {}) {
       const runOptions = resolveRunOptions(options, getCurrentUrl, getVideoIdFromUrl);
       const sourceUrl = runOptions.sourceUrl;
@@ -236,10 +266,10 @@
       }
 
       const videoId = getVideoIdFromUrl(sourceUrl);
-      let transcriptEntries = await fetchTimedTextTranscriptImpl(playerResponse, videoId);
+      let transcriptEntries = await fetchInnerTubeTranscriptImpl(html, videoId);
 
-      if (!transcriptEntries.length && runOptions.allowPanelFallback) {
-        transcriptEntries = await fetchTranscriptFromPanelImpl();
+      if (!transcriptEntries.length) {
+        transcriptEntries = await fetchTimedTextTranscriptImpl(playerResponse, videoId);
       }
 
       if (!transcriptEntries.length) {
@@ -281,8 +311,8 @@
       copyTextToClipboard,
       extractTranscriptPackage,
       fetchHtml: fetchHtmlImpl,
+      fetchInnerTubeTranscript: fetchInnerTubeTranscriptImpl,
       fetchTimedTextTranscript: fetchTimedTextTranscriptImpl,
-      fetchTranscriptFromPanel: fetchTranscriptFromPanelImpl,
       formatTranscriptText,
       getTranscriptSourceUrl: getTranscriptSourceUrlImpl,
     };

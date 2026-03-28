@@ -5,43 +5,6 @@ const dom = require('../content-dom.js');
 
 const TRANSCRIPT_TILE_ICON_PATH = 'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
 
-function createLegacySegment(timestamp, text) {
-  return {
-    querySelector(selector) {
-      if (selector === 'div.segment-timestamp') {
-        return { textContent: timestamp };
-      }
-
-      if (selector === 'yt-formatted-string') {
-        return { textContent: text };
-      }
-
-      return null;
-    },
-  };
-}
-
-function createModernSegment(timestamp, text, options = {}) {
-  return {
-    textContent: options.fullText || `${timestamp}${text}`,
-    querySelector(selector) {
-      if (selector === '.ytwTranscriptSegmentViewModelTimestamp') {
-        return { textContent: timestamp };
-      }
-
-      if (selector === '.ytwTranscriptSegmentViewModelTimestampA11yLabel') {
-        return options.a11yLabel ? { textContent: options.a11yLabel } : null;
-      }
-
-      if (selector === 'span.yt-core-attributed-string[role="text"]') {
-        return options.omitTextNode ? null : { textContent: text };
-      }
-
-      return null;
-    },
-  };
-}
-
 function createButton(options = {}) {
   return {
     textContent: options.textContent || '',
@@ -54,30 +17,6 @@ function createButton(options = {}) {
     },
   };
 }
-
-test('content-dom reads legacy and modern transcript rows', () => {
-  assert.deepEqual(dom.readTranscriptEntriesFromSegmentNodes([
-    createLegacySegment('0:03', 'legacy transcript'),
-    createModernSegment('0:00', 'modern transcript line'),
-  ]), [
-    ['0:03', 'legacy transcript'],
-    ['0:00', 'modern transcript line'],
-  ]);
-});
-
-test('content-dom strips timestamp and accessibility label from fallback transcript text', () => {
-  assert.equal(
-    dom.extractModernTranscriptFallbackText(
-      createModernSegment('1:24', 'about it in the first sort', {
-        omitTextNode: true,
-        a11yLabel: '1 minute, 24 seconds',
-        fullText: '1:241 minute, 24 secondsabout it in the first sort',
-      }),
-      '1:24'
-    ),
-    'about it in the first sort'
-  );
-});
 
 test('content-dom creates transcript button markup with accessible status text', () => {
   const button = dom.createTranscriptButton({
@@ -367,61 +306,13 @@ test('content-dom animates button width when desktop label length changes', () =
   }
 });
 
-test('findTranscriptPanelButton returns the visible transcript section button', () => {
-  const transcriptButton = createButton();
-  const documentRef = {
-    querySelector(selector) {
-      if (selector === 'ytd-video-description-transcript-section-renderer #primary-button button') {
-        return transcriptButton;
-      }
-
-      return null;
-    },
-    querySelectorAll() {
-      return [];
-    },
-  };
-
-  assert.equal(dom.findTranscriptPanelButton(documentRef, () => true), transcriptButton);
-});
-
-test('findTranscriptPanelButton ignores generic primary buttons outside transcript containers', () => {
-  const unrelatedPrimaryButton = createButton();
-  const documentRef = {
-    querySelector(selector) {
-      if (selector === '#primary-button > ytd-button-renderer > yt-button-shape > button') {
-        return unrelatedPrimaryButton;
-      }
-
-      return null;
-    },
-    querySelectorAll() {
-      return [];
-    },
-  };
-
-  assert.equal(dom.findTranscriptPanelButton(documentRef, () => true), null);
-});
-
-test('findTranscriptPanelButton does not match localized labels without transcript structure', () => {
-  const localizedButton = createButton({
-    textContent: '显示字幕',
-    ariaLabel: '显示字幕',
-  });
-  const documentRef = {
-    querySelector() {
-      return null;
-    },
-    querySelectorAll(selector) {
-      if (selector === 'button') {
-        return [localizedButton];
-      }
-
-      return [];
-    },
-  };
-
-  assert.equal(dom.findTranscriptPanelButton(documentRef, () => true), null);
+test('content-dom no longer exports transcript panel helpers', () => {
+  assert.equal(dom.TRANSCRIPT_SEGMENT_SELECTOR, undefined);
+  assert.equal(dom.expandVideoDescription, undefined);
+  assert.equal(dom.extractModernTranscriptFallbackText, undefined);
+  assert.equal(dom.findTranscriptPanelButton, undefined);
+  assert.equal(dom.readTranscriptEntriesFromSegmentNodes, undefined);
+  assert.equal(dom.waitForSelector, undefined);
 });
 
 test('findSuitableButtonContainer ignores shorts-only action containers', () => {
