@@ -34,9 +34,28 @@ function getTranscriptWorkflowApi() {
   return null;
 }
 
+function getListHoverActionsApi() {
+  if (typeof window !== 'undefined' && window.TranscriptListHoverActions) {
+    return window.TranscriptListHoverActions;
+  }
+
+  if (typeof require === 'function') {
+    return require('./content-hover-actions.js');
+  }
+
+  return null;
+}
+
 const SUCCESS_BUTTON_FEEDBACK_MS = 1800;
 const ERROR_BUTTON_FEEDBACK_MS = 3000;
 const NO_TRANSCRIPT_ERROR_MESSAGE = 'No captions found';
+const WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS = [
+  '#movie_player button.ytp-subtitles-button',
+  '#movie_player .ytp-right-controls-left button.ytp-subtitles-button',
+];
+const LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS = [
+  '.ytInlinePlayerControlsTopRightControls .ytmClosedCaptioningButtonButton',
+];
 
 class YoutubeTranscriptionExtension {
   static readTranscriptEntriesFromSegmentNodes(segmentNodes) {
@@ -57,6 +76,7 @@ class YoutubeTranscriptionExtension {
     this.dom = getTranscriptDomApi();
     this.core = getTranscriptCoreApi();
     this.workflow = null;
+    this.listHoverController = null;
 
     this.initializeExtension();
   }
@@ -80,13 +100,31 @@ class YoutubeTranscriptionExtension {
       getPageTitle: () => this.getPageTitle(),
       waitForMilliseconds: (milliseconds) => this.waitForMilliseconds(milliseconds),
       waitForSelector: (selector, timeout) => this.waitForSelector(selector, timeout),
+      findCaptionToggleButton: () => this.findCaptionToggleButton(),
       findTranscriptPanelButton: async () => this.findTranscriptPanelButton(),
       transcriptSegmentSelector: this.dom.TRANSCRIPT_SEGMENT_SELECTOR,
     });
 
+    const listHoverActionsApi = getListHoverActionsApi();
+
+    if (listHoverActionsApi?.createListHoverUrlController) {
+      this.listHoverController = listHoverActionsApi.createListHoverUrlController({
+        documentRef: document,
+        windowRef: window,
+        locationRef: window.location,
+        MutationObserverCtor: MutationObserver,
+        onTranscriptButtonClick: ({ buttonElement, watchUrl }) => {
+          void this.handleListHoverTranscriptButtonClick({
+            buttonElement,
+            watchUrl,
+          });
+        },
+      });
+    }
+
     this.setupGlobalDebugTool();
     this.observePageNavigation();
-    this.startObservingButtonContainer();
+    this.handlePageChange(window.location.href);
   }
 
   observePageNavigation() {
@@ -100,8 +138,9 @@ class YoutubeTranscriptionExtension {
       }
 
       lastUrl = currentUrl;
+
       this.cleanupPreviousButton();
-      this.startObservingButtonContainer();
+      this.handlePageChange(currentUrl);
     };
 
     new MutationObserver(handleNavigationChange).observe(document, {
@@ -171,16 +210,54 @@ class YoutubeTranscriptionExtension {
     });
   }
 
-  isYoutubeVideoPage() {
-    return Boolean(this.getVideoId());
+  isYoutubeVideoPage(url = window.location.href) {
+    return Boolean(this.getVideoId(url));
   }
 
   getVideoId(url = window.location.href) {
     return this.core.getVideoIdFromUrl(url);
   }
 
+  handlePageChange(url = window.location.href) {
+    if (this.isYoutubeVideoPage(url)) {
+      this.listHoverController?.stop?.();
+      this.startObservingButtonContainer();
+      return;
+    }
+
+    this.cleanupPreviousButton();
+    this.listHoverController?.start?.();
+  }
+
   findSuitableButtonContainer() {
     return this.dom.findSuitableButtonContainer(document);
+  }
+
+  findVisibleElement(documentRef, selectors, mode = 'first') {
+    let result = null;
+
+    for (const selector of selectors) {
+      const matches = Array.from(documentRef?.querySelectorAll?.(selector) || []);
+
+      for (const match of matches) {
+        if (this.isElementVisible(match)) {
+          if (mode === 'first') {
+            return match;
+          }
+
+          result = match;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  findCaptionToggleButton(documentRef = document) {
+    return (
+      this.findVisibleElement(documentRef, WATCH_CAPTION_TOGGLE_BUTTON_SELECTORS, 'first') ||
+      this.findVisibleElement(documentRef, LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS, 'last')
+    );
   }
 
   isValidWatchContainer(element) {
@@ -211,36 +288,108 @@ class YoutubeTranscriptionExtension {
     }
 
     const button = this.dom.createTranscriptButton(document, () => {
-      void this.handleTranscriptButtonClick();
+      void this.handleTranscriptButtonClick(button);
     });
 
     targetContainer.appendChild(button);
     this.transcriptButton = button;
   }
 
-  async handleTranscriptButtonClick() {
-    if (this.isExtracting) {
+  isMainActionTarget(button) {
+    return !button || button === this.transcriptButton;
+  }
+
+  getActionState(button) {
+    if (this.isMainActionTarget(button)) {
+      return {
+        isExtracting: this.isExtracting,
+        resetTimeout: this.buttonStateResetTimeout,
+      };
+    }
+
+    if (!button._ytTranscriptActionState) {
+      button._ytTranscriptActionState = {
+        isExtracting: false,
+        resetTimeout: null,
+      };
+    }
+
+    return button._ytTranscriptActionState;
+  }
+
+  setActionState(button, patch) {
+    if (this.isMainActionTarget(button)) {
+      if (Object.prototype.hasOwnProperty.call(patch, 'isExtracting')) {
+        this.isExtracting = patch.isExtracting;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(patch, 'resetTimeout')) {
+        this.buttonStateResetTimeout = patch.resetTimeout;
+      }
+
       return;
     }
 
-    this.clearButtonStateResetTimeout();
-    this.isExtracting = true;
-    this.updateButtonState('loading');
+    Object.assign(this.getActionState(button), patch);
+  }
+
+  async handleTranscriptButtonClick(button = null) {
+    return this.runTranscriptAction({
+      button,
+      updateState: (state) => this.updateButtonState(state),
+    });
+  }
+
+  async handleListHoverTranscriptButtonClick({ buttonElement, watchUrl }) {
+    return this.runTranscriptAction({
+      allowPanelFallback: false,
+      button: buttonElement,
+      displayUrl: watchUrl,
+      sourceUrl: watchUrl,
+      updateState: (state) => this.dom.updateHoverButtonState(buttonElement, state),
+    });
+  }
+
+  async runTranscriptAction({
+    allowPanelFallback,
+    button = null,
+    displayUrl,
+    sourceUrl,
+    updateState,
+  }) {
+    const actionState = this.getActionState(button);
+
+    if (actionState.isExtracting) {
+      return;
+    }
+
+    this.clearButtonStateResetTimeout(button);
+    this.setActionState(button, { isExtracting: true });
+    updateState('loading');
 
     try {
-      const transcriptPackage = await this.extractTranscriptPackage();
+      const transcriptPackage = await this.extractTranscriptPackage({
+        allowPanelFallback,
+        displayUrl,
+        sourceUrl,
+      });
       await this.copyTextToClipboard(transcriptPackage);
-      this.showTemporaryButtonState('success', SUCCESS_BUTTON_FEEDBACK_MS);
+      this.showTemporaryButtonState(button, updateState, 'success', SUCCESS_BUTTON_FEEDBACK_MS);
     } catch (error) {
       console.error('Transcript extraction failed:', error);
-      this.showTemporaryButtonState(this.getFeedbackStateForError(error), ERROR_BUTTON_FEEDBACK_MS);
+      this.showTemporaryButtonState(
+        button,
+        updateState,
+        this.getFeedbackStateForError(error),
+        ERROR_BUTTON_FEEDBACK_MS
+      );
     } finally {
-      this.isExtracting = false;
+      this.setActionState(button, { isExtracting: false });
     }
   }
 
-  async extractTranscriptPackage() {
-    return this.workflow.extractTranscriptPackage();
+  async extractTranscriptPackage(options = {}) {
+    return this.workflow.extractTranscriptPackage(options);
   }
 
   getTranscriptSourceUrl() {
@@ -292,24 +441,28 @@ class YoutubeTranscriptionExtension {
     this.dom.updateButtonState(this.transcriptButton, state);
   }
 
-  showTemporaryButtonState(state, duration) {
-    this.updateButtonState(state);
-    this.buttonStateResetTimeout = setTimeout(() => {
-      this.buttonStateResetTimeout = null;
+  showTemporaryButtonState(button, updateState, state, duration) {
+    updateState(state);
+    const timeout = setTimeout(() => {
+      this.setActionState(button, { resetTimeout: null });
 
-      if (!this.isExtracting) {
-        this.updateButtonState('normal');
+      if (!this.getActionState(button).isExtracting) {
+        updateState('normal');
       }
     }, duration);
+
+    this.setActionState(button, { resetTimeout: timeout });
   }
 
-  clearButtonStateResetTimeout() {
-    if (!this.buttonStateResetTimeout) {
+  clearButtonStateResetTimeout(button = null) {
+    const { resetTimeout } = this.getActionState(button);
+
+    if (!resetTimeout) {
       return;
     }
 
-    clearTimeout(this.buttonStateResetTimeout);
-    this.buttonStateResetTimeout = null;
+    clearTimeout(resetTimeout);
+    this.setActionState(button, { resetTimeout: null });
   }
 
   getFeedbackStateForError(error) {
@@ -326,20 +479,6 @@ class YoutubeTranscriptionExtension {
 
   waitForSelector(selector, timeout = 3000) {
     return this.dom.waitForSelector(document, selector, timeout);
-  }
-
-  timestampToMilliseconds(timestamp) {
-    const parts = timestamp.split(':').map((part) => Number(part));
-
-    if (parts.length === 2) {
-      return ((parts[0] * 60) + parts[1]) * 1000;
-    }
-
-    if (parts.length === 3) {
-      return ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
-    }
-
-    return 0;
   }
 
   isElementVisible(element) {

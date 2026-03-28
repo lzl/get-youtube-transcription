@@ -50,6 +50,103 @@ test('createTranscriptWorkflow prefers timedtext entries and falls back to panel
   assert.equal(panelPackage.body, '0:02: Panel line');
 });
 
+test('createTranscriptWorkflow supports per-run sourceUrl and displayUrl overrides', async () => {
+  const fetchHtmlCalls = [];
+  const videoIdCalls = [];
+  const workflow = createWorkflow({
+    fetchHtml: async (url) => {
+      fetchHtmlCalls.push(url);
+      return '<html></html>';
+    },
+    getVideoIdFromUrl: (url) => {
+      videoIdCalls.push(url);
+      return new URL(url).searchParams.get('v');
+    },
+    fetchTimedTextTranscript: async (_playerResponse, videoId) => [[`id:${videoId}`, 'Timed text line']],
+  });
+
+  const transcriptPackage = await workflow.extractTranscriptPackage({
+    sourceUrl: 'https://www.youtube.com/watch?v=source-123',
+    displayUrl: 'https://www.youtube.com/watch?v=display-456',
+  });
+
+  assert.deepEqual(fetchHtmlCalls, ['https://www.youtube.com/watch?v=source-123']);
+  assert.deepEqual(videoIdCalls, ['https://www.youtube.com/watch?v=source-123']);
+  assert.equal(transcriptPackage.url, 'https://www.youtube.com/watch?v=display-456');
+  assert.equal(transcriptPackage.body, 'id:source-123: Timed text line');
+});
+
+test('createTranscriptWorkflow skips transcript panel fallback when allowPanelFallback is false', async () => {
+  let panelFallbackCalls = 0;
+  const workflow = createWorkflow({
+    fetchTimedTextTranscript: async () => [],
+    fetchTranscriptFromPanel: async () => {
+      panelFallbackCalls += 1;
+      return [['0:02', 'Panel line']];
+    },
+  });
+
+  await assert.rejects(
+    workflow.extractTranscriptPackage({
+      sourceUrl: 'https://www.youtube.com/watch?v=video-123',
+      displayUrl: 'https://www.youtube.com/watch?v=video-123',
+      allowPanelFallback: false,
+    }),
+    /No captions found/
+  );
+
+  assert.equal(panelFallbackCalls, 0);
+});
+
+test('createTranscriptWorkflow capturePotToken uses the injected caption toggle finder', async () => {
+  let clickCount = 0;
+  let clickListener = null;
+  let listenerStarted = false;
+  const captionToggleButton = {
+    addEventListener(eventName, listener) {
+      if (eventName === 'click') {
+        clickListener = listener;
+      }
+    },
+    click() {
+      clickCount += 1;
+
+      if (!listenerStarted && clickListener) {
+        listenerStarted = true;
+        void clickListener();
+      }
+    },
+  };
+  const workflow = createTranscriptWorkflow({
+    TranscriptCore: require('../transcript-core.js'),
+    documentRef: {},
+    performanceRef: {
+      clearResourceTimings() {},
+      getEntriesByType(type) {
+        if (type !== 'resource' || clickCount < 2) {
+          return [];
+        }
+
+        return [
+          {
+            name: 'https://www.youtube.com/api/timedtext?v=video-123&pot=token-123',
+          },
+        ];
+      },
+    },
+    findCaptionToggleButton: () => captionToggleButton,
+    getVideoIdFromUrl: () => 'video-123',
+    navigatorRef: { clipboard: { writeText: async () => {} } },
+    resolvePageData: () => ({ title: 'Resolved Title' }),
+    waitForMilliseconds: async () => {},
+  });
+
+  const token = await workflow.capturePotToken('video-123');
+
+  assert.equal(token, 'token-123');
+  assert.equal(clickCount, 2);
+});
+
 test('createTranscriptWorkflow formats clipboard text as title, URL, blank line, body', () => {
   const workflow = createWorkflow();
 

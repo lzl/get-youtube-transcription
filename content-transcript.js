@@ -27,6 +27,18 @@
     return currentUrl;
   }
 
+  function resolveRunOptions(options, getCurrentUrl, getVideoIdFromUrl) {
+    const currentUrl = options?.currentUrl || getCurrentUrl();
+    const sourceUrl = options?.sourceUrl || getTranscriptSourceUrl(currentUrl, getVideoIdFromUrl);
+
+    return {
+      allowPanelFallback: options?.allowPanelFallback !== false,
+      currentUrl,
+      displayUrl: options?.displayUrl || currentUrl,
+      sourceUrl,
+    };
+  }
+
   function createTranscriptWorkflow(overrides = {}) {
     const {
       TranscriptCore,
@@ -37,6 +49,7 @@
       fetchImpl = typeof fetch === 'function' ? fetch.bind(globalRoot) : null,
       fetchTimedTextTranscript,
       fetchTranscriptFromPanel,
+      findCaptionToggleButton,
       findTranscriptPanelButton,
       getCurrentUrl = () => '',
       getPageTitle = () => 'Unknown Title',
@@ -86,7 +99,7 @@
         return potTokens.get(cacheKey);
       }
 
-      const subtitlesButton = documentRef?.querySelector(
+      const subtitlesButton = findCaptionToggleButton?.() || documentRef?.querySelector?.(
         '#movie_player button.ytp-subtitles-button, #movie_player .ytp-right-controls-left button.ytp-subtitles-button'
       );
 
@@ -206,8 +219,9 @@
       return readTranscriptEntriesFromSegmentNodes(documentRef.querySelectorAll(transcriptSegmentSelector));
     }
 
-    async function extractTranscriptPackage() {
-      const sourceUrl = getTranscriptSourceUrlImpl();
+    async function extractTranscriptPackage(options = {}) {
+      const runOptions = resolveRunOptions(options, getCurrentUrl, getVideoIdFromUrl);
+      const sourceUrl = runOptions.sourceUrl;
       const html = await fetchHtmlImpl(sourceUrl);
       const pageData = resolvePageData(html);
 
@@ -224,7 +238,7 @@
       const videoId = getVideoIdFromUrl(sourceUrl);
       let transcriptEntries = await fetchTimedTextTranscriptImpl(playerResponse, videoId);
 
-      if (!transcriptEntries.length) {
+      if (!transcriptEntries.length && runOptions.allowPanelFallback) {
         transcriptEntries = await fetchTranscriptFromPanelImpl();
       }
 
@@ -234,7 +248,7 @@
 
       return {
         title: pageData.title || getPageTitle(),
-        url: getCurrentUrl(),
+        url: runOptions.displayUrl,
         body: formatTranscriptText(transcriptEntries),
         entries: transcriptEntries,
       };

@@ -214,6 +214,61 @@ function createStatefulButton() {
   return { button, label, status, path };
 }
 
+function createHoverStatefulButton() {
+  const wrapper = {
+    dataset: {},
+    className: 'ytInlinePlayerControlsTopRightControlsCircleButton yt-list-transcript-player-button',
+    style: {},
+  };
+  const path = {
+    d: 'initial',
+    setAttribute(name, value) {
+      if (name === 'd') {
+        this.d = value;
+      }
+    },
+    getAttribute(name) {
+      if (name === 'd') {
+        return this.d;
+      }
+
+      return null;
+    },
+  };
+  const attributes = {
+    title: 'Get video transcript with one click',
+    'aria-label': 'Get video transcript with one click',
+  };
+  const button = {
+    disabled: false,
+    dataset: {},
+    parentNode: wrapper,
+    parentElement: wrapper,
+    _ytTranscriptNormalTitle: 'Copy transcript',
+    _ytTranscriptNormalAriaLabel: 'Copy transcript',
+    title: attributes.title,
+    setAttribute(name, value) {
+      attributes[name] = value;
+
+      if (name === 'title') {
+        this.title = value;
+      }
+    },
+    getAttribute(name) {
+      return attributes[name] || null;
+    },
+    querySelector(selector) {
+      if (selector === 'svg path') {
+        return path;
+      }
+
+      return null;
+    },
+  };
+
+  return { button, path };
+}
+
 test('content-dom updates success button state with accessible copy feedback', () => {
   const { button, label, status, path } = createStatefulButton();
 
@@ -238,6 +293,45 @@ test('content-dom updates loading button state and keeps it disabled', () => {
   assert.equal(label.textContent, 'Getting transcript...');
   assert.equal(status.textContent, 'Getting transcript...');
   assert.equal(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
+});
+
+test('content-dom updates hover button state without watch-button width animation', () => {
+  const { button, path } = createHoverStatefulButton();
+
+  dom.updateHoverButtonState(button, 'success');
+
+  assert.equal(button.dataset.state, 'success');
+  assert.equal(button.parentNode.dataset.state, 'success');
+  assert.equal(button.disabled, false);
+  assert.equal(button.title, 'Transcript copied to clipboard');
+  assert.equal(button.getAttribute('aria-label'), 'Transcript copied to clipboard');
+  assert.notEqual(path.getAttribute('d'), 'initial');
+});
+
+test('content-dom updates hover button loading state and keeps it disabled', () => {
+  const { button, path } = createHoverStatefulButton();
+
+  dom.updateHoverButtonState(button, 'loading');
+
+  assert.equal(button.dataset.state, 'loading');
+  assert.equal(button.parentNode.dataset.state, 'loading');
+  assert.equal(button.disabled, true);
+  assert.equal(button.title, 'Getting transcript...');
+  assert.equal(button.getAttribute('aria-label'), 'Getting transcript...');
+  assert.equal(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
+});
+
+test('content-dom restores hover button normal title and aria label from the list-hover defaults', () => {
+  const { button } = createHoverStatefulButton();
+
+  dom.updateHoverButtonState(button, 'success');
+  dom.updateHoverButtonState(button, 'normal');
+
+  assert.equal(button.dataset.state, 'normal');
+  assert.equal(button.parentNode.dataset.state, 'normal');
+  assert.equal(button.disabled, false);
+  assert.equal(button.title, 'Copy transcript');
+  assert.equal(button.getAttribute('aria-label'), 'Copy transcript');
 });
 
 test('content-dom animates button width when desktop label length changes', () => {

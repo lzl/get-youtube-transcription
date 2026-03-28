@@ -262,6 +262,73 @@
     animateButtonWidth(button, currentWidth, measureNaturalButtonWidth(button));
   }
 
+  function elementHasClass(element, className) {
+    if (!element || !className) {
+      return false;
+    }
+
+    if (element.classList?.contains) {
+      return element.classList.contains(className);
+    }
+
+    return String(element.className || '')
+      .split(/\s+/)
+      .includes(className);
+  }
+
+  function findAncestorByClassName(element, className) {
+    let current = element?.parentElement || element?.parentNode || null;
+
+    while (current) {
+      if (elementHasClass(current, className)) {
+        return current;
+      }
+
+      current = current.parentElement || current.parentNode || null;
+    }
+
+    return null;
+  }
+
+  function updateHoverButtonState(button, state) {
+    if (!button) {
+      return;
+    }
+
+    const resolvedState = BUTTON_STATES[state] ? state : 'normal';
+    const nextState = BUTTON_STATES[resolvedState];
+    const iconPath = button.querySelector?.('svg path');
+    const wrapper = findAncestorByClassName(button, 'yt-list-transcript-player-button');
+    const nextTitle =
+      resolvedState === 'normal' ? button._ytTranscriptNormalTitle || nextState.title : nextState.title;
+    const nextAriaLabel =
+      resolvedState === 'normal'
+        ? button._ytTranscriptNormalAriaLabel || nextState.ariaLabel
+        : nextState.ariaLabel;
+
+    button.disabled = nextState.disabled;
+    button.dataset.state = resolvedState;
+    if (wrapper?.dataset) {
+      wrapper.dataset.state = resolvedState;
+    }
+    button.title = nextTitle;
+    button.setAttribute?.('title', nextTitle);
+    button.setAttribute?.('aria-label', nextAriaLabel);
+
+    const tooltip =
+      wrapper?.querySelector?.('#tooltip, tp-yt-paper-tooltip #tooltip, yt-formatted-string') ||
+      wrapper?.querySelector?.('#tooltip') ||
+      wrapper?.querySelector?.('yt-formatted-string');
+
+    if (tooltip) {
+      tooltip.textContent = nextTitle;
+    }
+
+    if (iconPath) {
+      iconPath.setAttribute?.('d', nextState.iconPath);
+    }
+  }
+
   function waitForMilliseconds(milliseconds) {
     return new Promise((resolve) => {
       setTimeout(resolve, milliseconds);
@@ -346,6 +413,8 @@
   }
 
   return {
+    DEFAULT_BUTTON_TITLE,
+    TRANSCRIPT_ICON_PATH,
     TRANSCRIPT_SEGMENT_SELECTOR,
     createTranscriptButton,
     expandVideoDescription,
@@ -356,6 +425,7 @@
     isElementVisible,
     isValidWatchContainer,
     readTranscriptEntriesFromSegmentNodes,
+    updateHoverButtonState,
     updateButtonState,
     waitForMilliseconds,
     waitForSelector,
