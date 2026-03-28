@@ -208,6 +208,273 @@ function createHoverStatefulButton() {
   return { button, path };
 }
 
+function createTreeElement(tagName, options = {}) {
+  const element = {
+    tagName: String(tagName || '').toUpperCase(),
+    children: [],
+    attributes: { ...(options.attributes || {}) },
+    className: options.className || '',
+    id: options.id || '',
+    textContent: options.textContent || '',
+    title: options.title || '',
+    ariaLabel: options.ariaLabel || '',
+    dataset: { ...(options.dataset || {}) },
+    disabled: options.disabled || false,
+    type: options.type || '',
+    style: {},
+    listeners: new Map(),
+    parentNode: null,
+    parentElement: null,
+    appendChild(child) {
+      child.parentNode = this;
+      child.parentElement = this;
+      this.children.push(child);
+      return child;
+    },
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+
+      if (name === 'class') {
+        this.className = value;
+      }
+
+      if (name === 'id') {
+        this.id = value;
+      }
+
+      if (name === 'title') {
+        this.title = value;
+      }
+
+      if (name === 'aria-label') {
+        this.ariaLabel = value;
+      }
+    },
+    getAttribute(name) {
+      if (name === 'class') {
+        return this.className || null;
+      }
+
+      if (name === 'id') {
+        return this.id || null;
+      }
+
+      if (name === 'title') {
+        return this.title || null;
+      }
+
+      if (name === 'aria-label') {
+        return this.ariaLabel || null;
+      }
+
+      return this.attributes[name] || null;
+    },
+    removeAttribute(name) {
+      delete this.attributes[name];
+
+      if (name === 'class') {
+        this.className = '';
+      }
+
+      if (name === 'id') {
+        this.id = '';
+      }
+
+      if (name === 'title') {
+        this.title = '';
+      }
+
+      if (name === 'aria-label') {
+        this.ariaLabel = '';
+      }
+    },
+    addEventListener(name, listener) {
+      this.listeners.set(name, listener);
+    },
+    querySelector(selector) {
+      return queryTree(this, selector)[0] || null;
+    },
+    querySelectorAll(selector) {
+      return queryTree(this, selector);
+    },
+    cloneNode() {
+      return cloneTreeElement(this);
+    },
+  };
+
+  if (element.className) {
+    element.attributes.class = element.className;
+  }
+
+  if (element.id) {
+    element.attributes.id = element.id;
+  }
+
+  if (element.title) {
+    element.attributes.title = element.title;
+  }
+
+  if (element.ariaLabel) {
+    element.attributes['aria-label'] = element.ariaLabel;
+  }
+
+  return element;
+}
+
+function cloneTreeElement(source) {
+  const clone = createTreeElement(source.tagName, {
+    attributes: source.attributes,
+    className: source.className,
+    id: source.id,
+    textContent: source.textContent,
+    title: source.title,
+    ariaLabel: source.ariaLabel,
+    dataset: source.dataset,
+    disabled: source.disabled,
+    type: source.type,
+  });
+
+  for (const child of source.children) {
+    clone.appendChild(cloneTreeElement(child));
+  }
+
+  return clone;
+}
+
+function hasClass(element, className) {
+  return String(element?.className || '')
+    .split(/\s+/)
+    .includes(className);
+}
+
+function hasAncestor(element, predicate) {
+  let current = element?.parentElement || element?.parentNode || null;
+
+  while (current) {
+    if (predicate(current)) {
+      return true;
+    }
+
+    current = current.parentElement || current.parentNode || null;
+  }
+
+  return false;
+}
+
+function matchesTreeSelector(element, selector) {
+  if (!element) {
+    return false;
+  }
+
+  if (selector === 'button') {
+    return element.tagName === 'BUTTON';
+  }
+
+  if (selector === 'svg path') {
+    return element.tagName === 'PATH' && element.parentElement?.tagName === 'SVG';
+  }
+
+  if (selector === '.yt-spec-button-shape-with-label__label') {
+    return hasClass(element, 'yt-spec-button-shape-with-label__label');
+  }
+
+  if (selector === 'button-view-model') {
+    return element.tagName === 'BUTTON-VIEW-MODEL';
+  }
+
+  if (selector === 'button-view-model.ytwReelActionBarViewModelHostDesktopActionButton') {
+    return element.tagName === 'BUTTON-VIEW-MODEL' && hasClass(element, 'ytwReelActionBarViewModelHostDesktopActionButton');
+  }
+
+  if (selector === '#shorts-container reel-action-bar-view-model') {
+    return element.tagName === 'REEL-ACTION-BAR-VIEW-MODEL' && hasAncestor(element, (node) => node.id === 'shorts-container');
+  }
+
+  if (selector === 'reel-action-bar-view-model.ytwReelActionBarViewModelHostDesktop') {
+    return element.tagName === 'REEL-ACTION-BAR-VIEW-MODEL' && hasClass(element, 'ytwReelActionBarViewModelHostDesktop');
+  }
+
+  if (selector === '[data-yt-shorts-transcript-button="true"]') {
+    return element.getAttribute('data-yt-shorts-transcript-button') === 'true';
+  }
+
+  return false;
+}
+
+function walkTree(root, visitor) {
+  for (const child of root?.children || []) {
+    visitor(child);
+    walkTree(child, visitor);
+  }
+}
+
+function queryTree(root, selector) {
+  const matches = [];
+  walkTree(root, (element) => {
+    if (matchesTreeSelector(element, selector)) {
+      matches.push(element);
+    }
+  });
+  return matches;
+}
+
+function createShortsActionBarFixture() {
+  const shortsContainer = createTreeElement('div', { id: 'shorts-container' });
+  const actionBar = createTreeElement('reel-action-bar-view-model', {
+    className: 'ytwReelActionBarViewModelHostDesktop',
+  });
+  const actionRoot = createTreeElement('button-view-model', {
+    className: 'ytSpecButtonViewModelHost ytwReelActionBarViewModelHostDesktopActionButton',
+  });
+  const labelWrapper = createTreeElement('label', {
+    className: 'yt-spec-button-shape-with-label',
+  });
+  const button = createTreeElement('button', {
+    className: 'yt-spec-button-shape-next',
+    ariaLabel: 'View 40 comments',
+  });
+  const icon = createTreeElement('svg');
+  const path = createTreeElement('path', {
+    attributes: { d: 'initial' },
+  });
+  const countLabel = createTreeElement('div', {
+    className: 'yt-spec-button-shape-with-label__label',
+    textContent: '40',
+  });
+
+  icon.appendChild(path);
+  button.appendChild(icon);
+  labelWrapper.appendChild(button);
+  labelWrapper.appendChild(countLabel);
+  actionRoot.appendChild(labelWrapper);
+  actionBar.appendChild(actionRoot);
+  shortsContainer.appendChild(actionBar);
+
+  const documentRef = {
+    querySelector(selector) {
+      if (selector === '#shorts-container reel-action-bar-view-model') {
+        return actionBar;
+      }
+
+      if (selector === 'reel-action-bar-view-model.ytwReelActionBarViewModelHostDesktop') {
+        return actionBar;
+      }
+
+      return null;
+    },
+  };
+
+  return {
+    actionBar,
+    actionRoot,
+    button,
+    countLabel,
+    documentRef,
+    path,
+    shortsContainer,
+  };
+}
+
 test('content-dom updates success button state with accessible copy feedback', () => {
   const { button, label, status, path } = createStatefulButton();
 
@@ -258,6 +525,42 @@ test('content-dom updates hover button loading state and keeps it disabled', () 
   assert.equal(button.title, 'Getting transcript...');
   assert.equal(button.getAttribute('aria-label'), 'Getting transcript...');
   assert.equal(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
+});
+
+test('content-dom finds the desktop shorts action bar', () => {
+  const { actionBar, documentRef } = createShortsActionBarFixture();
+
+  assert.equal(dom.findSuitableShortsActionBar(documentRef), actionBar);
+});
+
+test('content-dom creates a native-looking shorts transcript action', () => {
+  const { actionBar } = createShortsActionBarFixture();
+
+  const result = dom.createShortsTranscriptButton({}, actionBar, () => {});
+
+  assert.equal(result.root.tagName, 'BUTTON-VIEW-MODEL');
+  assert.equal(result.root.getAttribute('data-yt-shorts-transcript-button'), 'true');
+  assert.equal(result.button.tagName, 'BUTTON');
+  assert.equal(result.button.getAttribute('aria-label'), 'Transcript');
+  assert.equal(result.button.title, 'Transcript');
+  assert.equal(result.root.querySelector('.yt-spec-button-shape-with-label__label').textContent, 'Transcript');
+  assert.equal(result.root.querySelector('svg path').getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
+});
+
+test('content-dom updates shorts button state without changing the visible label', () => {
+  const { actionBar } = createShortsActionBarFixture();
+  const result = dom.createShortsTranscriptButton({}, actionBar, () => {});
+  const shortsLabel = result.root.querySelector('.yt-spec-button-shape-with-label__label');
+  const path = result.root.querySelector('svg path');
+
+  dom.updateShortsButtonState(result.button, 'success');
+
+  assert.equal(result.root.dataset.state, 'success');
+  assert.equal(result.button.dataset.state, 'success');
+  assert.equal(result.button.title, 'Transcript copied to clipboard');
+  assert.equal(result.button.getAttribute('aria-label'), 'Transcript copied to clipboard');
+  assert.equal(shortsLabel.textContent, 'Transcript');
+  assert.notEqual(path.getAttribute('d'), TRANSCRIPT_TILE_ICON_PATH);
 });
 
 test('content-dom restores hover button normal title and aria label from the list-hover defaults', () => {

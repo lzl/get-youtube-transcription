@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createTranscriptWorkflow } = require('../content-transcript.js');
+const TranscriptCore = require('../transcript-core.js');
 
 function createWorkflow(overrides = {}) {
   return createTranscriptWorkflow({
@@ -79,6 +80,38 @@ test('createTranscriptWorkflow supports per-run sourceUrl and displayUrl overrid
   assert.deepEqual(fetchHtmlCalls, ['https://www.youtube.com/watch?v=source-123']);
   assert.deepEqual(videoIdCalls, ['https://www.youtube.com/watch?v=source-123']);
   assert.equal(transcriptPackage.url, 'https://www.youtube.com/watch?v=display-456');
+  assert.equal(transcriptPackage.body, 'id:source-123: Timed text line');
+});
+
+test('createTranscriptWorkflow preserves shorts URLs and resolves the shorts video ID', async () => {
+  const workflow = createWorkflow({
+    extractPlayerResponse: () => ({ id: 'player-response' }),
+    getVideoIdFromUrl: (url) => TranscriptCore.getVideoIdFromUrl(url),
+    fetchTimedTextTranscript: async (_playerResponse, videoId) => [[`id:${videoId}`, 'Timed text line']],
+  });
+
+  const transcriptPackage = await workflow.extractTranscriptPackage({
+    sourceUrl: 'https://www.youtube.com/shorts/source-123',
+    displayUrl: 'https://www.youtube.com/shorts/display-456',
+  });
+
+  assert.equal(transcriptPackage.url, 'https://www.youtube.com/shorts/display-456');
+  assert.equal(transcriptPackage.body, 'id:source-123: Timed text line');
+});
+
+test('createTranscriptWorkflow preserves live URLs and resolves the live video ID', async () => {
+  const workflow = createWorkflow({
+    extractPlayerResponse: () => ({ id: 'player-response' }),
+    getVideoIdFromUrl: (url) => TranscriptCore.getVideoIdFromUrl(url),
+    fetchTimedTextTranscript: async (_playerResponse, videoId) => [[`id:${videoId}`, 'Timed text line']],
+  });
+
+  const transcriptPackage = await workflow.extractTranscriptPackage({
+    sourceUrl: 'https://www.youtube.com/live/source-123',
+    displayUrl: 'https://www.youtube.com/live/display-456',
+  });
+
+  assert.equal(transcriptPackage.url, 'https://www.youtube.com/live/display-456');
   assert.equal(transcriptPackage.body, 'id:source-123: Timed text line');
 });
 

@@ -319,10 +319,30 @@
   }
 
   function getVideoIdFromUrl(url) {
-    const parsedUrl = new URL(url);
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const normalizedHostname = hostname.replace(/^www\./, '');
 
-    if (parsedUrl.pathname === '/watch') {
-      return parsedUrl.searchParams.get('v');
+      if (normalizedHostname === 'youtu.be') {
+        return parsedUrl.pathname.slice(1).split('/')[0] || null;
+      }
+
+      if (!normalizedHostname.endsWith('youtube.com')) {
+        return null;
+      }
+
+      if (parsedUrl.pathname === '/watch') {
+        return parsedUrl.searchParams.get('v');
+      }
+
+      const pathMatch = parsedUrl.pathname.match(/^\/(shorts|embed|live|v)\/([^/?]+)/);
+
+      if (pathMatch?.[2]) {
+        return pathMatch[2];
+      }
+    } catch (error) {
+      return null;
     }
 
     return null;

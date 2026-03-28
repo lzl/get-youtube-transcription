@@ -15,9 +15,15 @@
     '#actions-inner',
     '#menu-container',
   ];
+  const SHORTS_ACTION_BAR_SELECTORS = [
+    '#shorts-container reel-action-bar-view-model',
+    'reel-action-bar-view-model.ytwReelActionBarViewModelHostDesktop',
+  ];
 
   const DEFAULT_BUTTON_TITLE = 'Get video transcript with one click';
   const BUTTON_WIDTH_TRANSITION_MS = 220;
+  const SHORTS_BUTTON_LABEL = 'Transcript';
+  const SHORTS_TRANSCRIPT_BUTTON_ATTR = 'data-yt-shorts-transcript-button';
   const TRANSCRIPT_ICON_PATH = 'M7 4.5h10A2.5 2.5 0 0 1 19.5 7v2.25L16.75 12l2.75 2.75V17A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17V7A2.5 2.5 0 0 1 7 4.5Zm1.25 4H14a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H15.5a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Zm0 3.5H13a.75.75 0 0 1 0 1.5H8.25a.75.75 0 0 1 0-1.5Z';
   const SUCCESS_ICON_PATH = 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
   const NO_TRANSCRIPT_ICON_PATH = 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9.59L5 11.41 6.41 10 17 20.59V5H5v6.59L3.41 10 3 9.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v10.59L19.59 14H19V5zm-6.59 9L14 13.59 12.59 15H7v-2h5.41z';
@@ -88,6 +94,18 @@
       const element = documentRef.querySelector(selector);
 
       if (element && isValidWatchContainer(element)) {
+        return element;
+      }
+    }
+
+    return null;
+  }
+
+  function findSuitableShortsActionBar(documentRef) {
+    for (const selector of SHORTS_ACTION_BAR_SELECTORS) {
+      const element = documentRef?.querySelector?.(selector);
+
+      if (element) {
         return element;
       }
     }
@@ -204,6 +222,28 @@
     animateButtonWidth(button, currentWidth, measureNaturalButtonWidth(button));
   }
 
+  function walkElements(root, visitor) {
+    if (!root) {
+      return;
+    }
+
+    visitor(root);
+
+    for (const child of Array.from(root.children || [])) {
+      walkElements(child, visitor);
+    }
+  }
+
+  function clearInteractiveAttributes(root) {
+    const removableAttributes = ['command', 'command-target', 'target-id', 'href'];
+
+    walkElements(root, (element) => {
+      removableAttributes.forEach((attribute) => {
+        element.removeAttribute?.(attribute);
+      });
+    });
+  }
+
   function elementHasClass(element, className) {
     if (!element || !className) {
       return false;
@@ -223,6 +263,20 @@
 
     while (current) {
       if (elementHasClass(current, className)) {
+        return current;
+      }
+
+      current = current.parentElement || current.parentNode || null;
+    }
+
+    return null;
+  }
+
+  function findAncestorByAttributeValue(element, attributeName, expectedValue) {
+    let current = element || null;
+
+    while (current) {
+      if (current.getAttribute?.(attributeName) === expectedValue) {
         return current;
       }
 
@@ -271,6 +325,75 @@
     }
   }
 
+  function createShortsTranscriptButton(documentRef, actionBar, onClick) {
+    const templateAction =
+      actionBar?.querySelector?.('button-view-model.ytwReelActionBarViewModelHostDesktopActionButton') ||
+      actionBar?.querySelector?.('button-view-model');
+    const root = templateAction?.cloneNode?.(true);
+    const button = root?.querySelector?.('button');
+    const iconPath = root?.querySelector?.('svg path');
+    const label = root?.querySelector?.('.yt-spec-button-shape-with-label__label');
+
+    if (!root || !button || !iconPath || !label) {
+      return null;
+    }
+
+    clearInteractiveAttributes(root);
+    root.setAttribute?.(SHORTS_TRANSCRIPT_BUTTON_ATTR, 'true');
+    root.dataset.state = 'normal';
+    button.type = 'button';
+    button.title = SHORTS_BUTTON_LABEL;
+    button.dataset.state = 'normal';
+    button._ytTranscriptNormalTitle = SHORTS_BUTTON_LABEL;
+    button._ytTranscriptNormalAriaLabel = SHORTS_BUTTON_LABEL;
+    button._ytTranscriptActionRoot = root;
+    button.setAttribute?.('title', SHORTS_BUTTON_LABEL);
+    button.setAttribute?.('aria-label', SHORTS_BUTTON_LABEL);
+    button.removeAttribute?.('aria-pressed');
+    label.textContent = SHORTS_BUTTON_LABEL;
+    iconPath.setAttribute?.('d', TRANSCRIPT_ICON_PATH);
+    button.addEventListener?.('click', onClick);
+
+    return { root, button };
+  }
+
+  function updateShortsButtonState(button, state) {
+    if (!button) {
+      return;
+    }
+
+    const resolvedState = BUTTON_STATES[state] ? state : 'normal';
+    const nextState = BUTTON_STATES[resolvedState];
+    const wrapper =
+      button._ytTranscriptActionRoot || findAncestorByAttributeValue(button, SHORTS_TRANSCRIPT_BUTTON_ATTR, 'true');
+    const iconPath = button.querySelector?.('svg path');
+    const label = wrapper?.querySelector?.('.yt-spec-button-shape-with-label__label');
+    const nextTitle =
+      resolvedState === 'normal' ? button._ytTranscriptNormalTitle || SHORTS_BUTTON_LABEL : nextState.title;
+    const nextAriaLabel =
+      resolvedState === 'normal'
+        ? button._ytTranscriptNormalAriaLabel || SHORTS_BUTTON_LABEL
+        : nextState.ariaLabel;
+
+    button.disabled = nextState.disabled;
+    button.dataset.state = resolvedState;
+    button.title = nextTitle;
+    button.setAttribute?.('title', nextTitle);
+    button.setAttribute?.('aria-label', nextAriaLabel);
+
+    if (wrapper?.dataset) {
+      wrapper.dataset.state = resolvedState;
+    }
+
+    if (label) {
+      label.textContent = SHORTS_BUTTON_LABEL;
+    }
+
+    if (iconPath) {
+      iconPath.setAttribute?.('d', nextState.iconPath);
+    }
+  }
+
   function waitForMilliseconds(milliseconds) {
     return new Promise((resolve) => {
       setTimeout(resolve, milliseconds);
@@ -306,14 +429,18 @@
 
   return {
     DEFAULT_BUTTON_TITLE,
+    SHORTS_TRANSCRIPT_BUTTON_ATTR,
     TRANSCRIPT_ICON_PATH,
     createTranscriptButton,
+    createShortsTranscriptButton,
     findSuitableButtonContainer,
+    findSuitableShortsActionBar,
     getPageTitle,
     isElementVisible,
     isValidWatchContainer,
     updateHoverButtonState,
     updateButtonState,
+    updateShortsButtonState,
     waitForMilliseconds,
   };
 });
