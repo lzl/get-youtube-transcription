@@ -135,10 +135,20 @@ function createPageChangeStub() {
   const calls = [];
   const extension = Object.create(YoutubeTranscriptionExtension.prototype);
 
-  extension.startObservingButtonContainer = () => {
-    calls.push('start-watch');
+  extension.startObservingButtonContainer = (surface) => {
+    calls.push(`start-${surface || 'watch_like'}`);
   };
-  extension.getVideoId = (url) => (url.includes('watch?v=') ? 'video-123' : null);
+  extension.getPageSurface = (url) => {
+    if (url.includes('/shorts/')) {
+      return 'shorts';
+    }
+
+    if (url.includes('/watch?v=') || url.includes('/live/')) {
+      return 'watch_like';
+    }
+
+    return 'other';
+  };
   extension.cleanupPreviousButton = () => {
     calls.push('cleanup-watch');
   };
@@ -175,7 +185,129 @@ test('handlePageChange stops list hover controller and resumes watch button hand
 
   extension.handlePageChange('https://www.youtube.com/watch?v=video-123');
 
-  assert.deepEqual(calls, ['stop-list-hover', 'start-watch']);
+  assert.deepEqual(calls, ['stop-list-hover', 'start-watch_like']);
+});
+
+test('handlePageChange stops list hover controller and resumes watch-like button handling on live pages', () => {
+  const { extension, calls } = createPageChangeStub();
+
+  extension.handlePageChange('https://www.youtube.com/live/video-123');
+
+  assert.deepEqual(calls, ['stop-list-hover', 'start-watch_like']);
+});
+
+test('handlePageChange stops list hover controller and resumes shorts button handling on shorts pages', () => {
+  const { extension, calls } = createPageChangeStub();
+
+  extension.handlePageChange('https://www.youtube.com/shorts/video-123');
+
+  assert.deepEqual(calls, ['stop-list-hover', 'start-shorts']);
+});
+
+test('getPageSurface classifies watch-like, shorts, and other pages', () => {
+  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+
+  assert.equal(extension.getPageSurface('https://www.youtube.com/watch?v=video-123'), 'watch_like');
+  assert.equal(extension.getPageSurface('https://www.youtube.com/live/video-123'), 'watch_like');
+  assert.equal(extension.getPageSurface('https://www.youtube.com/shorts/video-123'), 'shorts');
+  assert.equal(extension.getPageSurface('https://www.youtube.com/'), 'other');
+});
+
+test('attemptToAddButton injects the shorts transcript action into the shorts action bar', () => {
+  const appendedChildren = [];
+  const shortsButton = { id: 'shorts-button' };
+  const shortsRoot = { id: 'shorts-root' };
+  const originalDocument = global.document;
+  global.document = {};
+
+  try {
+    const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+    extension.transcriptButton = null;
+    extension.transcriptButtonRoot = null;
+    extension.findSuitableShortsActionBar = () => ({
+      appendChild(child) {
+        appendedChildren.push(child);
+      },
+    });
+    extension.dom = {
+      createShortsTranscriptButton() {
+        return {
+          root: shortsRoot,
+          button: shortsButton,
+        };
+      },
+    };
+
+    extension.attemptToAddButton('shorts');
+
+    assert.deepEqual(appendedChildren, [shortsRoot]);
+    assert.equal(extension.transcriptButton, shortsButton);
+    assert.equal(extension.transcriptButtonRoot, shortsRoot);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test('attemptToAddButton delegates shorts action placement to the dom helper when available', () => {
+  const insertCalls = [];
+  const shortsButton = { id: 'shorts-button' };
+  const shortsRoot = { id: 'shorts-root' };
+  const actionBar = { id: 'shorts-bar' };
+  const originalDocument = global.document;
+  global.document = {};
+
+  try {
+    const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+    extension.transcriptButton = null;
+    extension.transcriptButtonRoot = null;
+    extension.findSuitableShortsActionBar = () => actionBar;
+    extension.dom = {
+      createShortsTranscriptButton() {
+        return {
+          root: shortsRoot,
+          button: shortsButton,
+        };
+      },
+      insertShortsTranscriptButton(container, root) {
+        insertCalls.push({ container, root });
+      },
+    };
+
+    extension.attemptToAddButton('shorts');
+
+    assert.deepEqual(insertCalls, [{ container: actionBar, root: shortsRoot }]);
+    assert.equal(extension.transcriptButton, shortsButton);
+    assert.equal(extension.transcriptButtonRoot, shortsRoot);
+  } finally {
+    global.document = originalDocument;
+  }
+});
+
+test('updateButtonState routes main shorts buttons through the shorts updater', () => {
+  const extension = Object.create(YoutubeTranscriptionExtension.prototype);
+  const updates = [];
+  extension.transcriptButton = { id: 'shorts-button' };
+  extension.transcriptButtonRoot = {
+    getAttribute(name) {
+      if (name === 'data-yt-shorts-transcript-button') {
+        return 'true';
+      }
+
+      return null;
+    },
+  };
+  extension.dom = {
+    updateButtonState() {
+      updates.push('watch');
+    },
+    updateShortsButtonState(_button, state) {
+      updates.push(state);
+    },
+  };
+
+  extension.updateButtonState('loading');
+
+  assert.deepEqual(updates, ['loading']);
 });
 
 test('findCaptionToggleButton returns the last visible list-page preview cc button', () => {

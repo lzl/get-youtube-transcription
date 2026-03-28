@@ -1,49 +1,29 @@
-function getTranscriptCoreApi() {
-  if (typeof window !== 'undefined' && window.TranscriptCore) {
-    return window.TranscriptCore;
+function getApi(windowKey, modulePath) {
+  if (typeof window !== 'undefined' && window[windowKey]) {
+    return window[windowKey];
   }
 
   if (typeof require === 'function') {
-    return require('./transcript-core.js');
+    return require(modulePath);
   }
 
   return null;
+}
+
+function getTranscriptCoreApi() {
+  return getApi('TranscriptCore', './transcript-core.js');
 }
 
 function getTranscriptDomApi() {
-  if (typeof window !== 'undefined' && window.TranscriptContentDom) {
-    return window.TranscriptContentDom;
-  }
-
-  if (typeof require === 'function') {
-    return require('./content-dom.js');
-  }
-
-  return null;
+  return getApi('TranscriptContentDom', './content-dom.js');
 }
 
 function getTranscriptWorkflowApi() {
-  if (typeof window !== 'undefined' && window.TranscriptContentWorkflow) {
-    return window.TranscriptContentWorkflow;
-  }
-
-  if (typeof require === 'function') {
-    return require('./content-transcript.js');
-  }
-
-  return null;
+  return getApi('TranscriptContentWorkflow', './content-transcript.js');
 }
 
 function getListHoverActionsApi() {
-  if (typeof window !== 'undefined' && window.TranscriptListHoverActions) {
-    return window.TranscriptListHoverActions;
-  }
-
-  if (typeof require === 'function') {
-    return require('./content-hover-actions.js');
-  }
-
-  return null;
+  return getApi('TranscriptListHoverActions', './content-hover-actions.js');
 }
 
 const SUCCESS_BUTTON_FEEDBACK_MS = 1800;
@@ -60,6 +40,7 @@ const LIST_PREVIEW_CAPTION_TOGGLE_BUTTON_SELECTORS = [
 class YoutubeTranscriptionExtension {
   constructor() {
     this.transcriptButton = null;
+    this.transcriptButtonRoot = null;
     this.isExtracting = false;
     this.containerObserver = null;
     this.buttonCheckInterval = null;
@@ -154,19 +135,29 @@ class YoutubeTranscriptionExtension {
 
     this.clearButtonStateResetTimeout();
 
-    if (this.transcriptButton && document.contains(this.transcriptButton)) {
-      this.transcriptButton.remove();
+    const removableRoot = this.getButtonRoot();
+
+    if (removableRoot && document.contains(removableRoot)) {
+      removableRoot.remove();
     }
 
     this.transcriptButton = null;
+    this.transcriptButtonRoot = null;
   }
 
-  startObservingButtonContainer() {
-    if (!this.isYoutubeVideoPage()) {
+  getButtonRoot() {
+    if (this.transcriptButtonRoot && document.contains(this.transcriptButtonRoot)) {
+      return this.transcriptButtonRoot;
+    }
+    return this.transcriptButton;
+  }
+
+  startObservingButtonContainer(surface = this.getPageSurface()) {
+    if (surface === 'other') {
       return;
     }
 
-    this.attemptToAddButton();
+    this.attemptToAddButton(surface);
     this.setupContainerObserver();
 
     if (this.buttonCheckInterval) {
@@ -174,13 +165,18 @@ class YoutubeTranscriptionExtension {
     }
 
     this.buttonCheckInterval = setInterval(() => {
-      if (!this.isYoutubeVideoPage()) {
+      const currentSurface = this.getPageSurface();
+
+      if (currentSurface === 'other') {
         return;
       }
 
-      if (!this.transcriptButton || !document.contains(this.transcriptButton)) {
+      const buttonRoot = this.getButtonRoot();
+
+      if (!buttonRoot || !document.contains(buttonRoot)) {
         this.transcriptButton = null;
-        this.attemptToAddButton();
+        this.transcriptButtonRoot = null;
+        this.attemptToAddButton(currentSurface);
       }
     }, 1500);
   }
@@ -202,14 +198,34 @@ class YoutubeTranscriptionExtension {
     return Boolean(this.getVideoId(url));
   }
 
+  getPageSurface(url = window.location.href) {
+    try {
+      const parsedUrl = new URL(url);
+
+      if (parsedUrl.pathname === '/watch' || /^\/live\/[^/?]+/.test(parsedUrl.pathname)) {
+        return 'watch_like';
+      }
+
+      if (/^\/shorts\/[^/?]+/.test(parsedUrl.pathname)) {
+        return 'shorts';
+      }
+    } catch (error) {
+      return 'other';
+    }
+
+    return 'other';
+  }
+
   getVideoId(url = window.location.href) {
     return this.core.getVideoIdFromUrl(url);
   }
 
   handlePageChange(url = window.location.href) {
-    if (this.isYoutubeVideoPage(url)) {
+    const surface = this.getPageSurface(url);
+
+    if (surface !== 'other') {
       this.listHoverController?.stop?.();
-      this.startObservingButtonContainer();
+      this.startObservingButtonContainer(surface);
       return;
     }
 
@@ -219,6 +235,10 @@ class YoutubeTranscriptionExtension {
 
   findSuitableButtonContainer() {
     return this.dom.findSuitableButtonContainer(document);
+  }
+
+  findSuitableShortsActionBar() {
+    return this.dom.findSuitableShortsActionBar(document);
   }
 
   findVisibleElement(documentRef, selectors, mode = 'first') {
@@ -252,26 +272,38 @@ class YoutubeTranscriptionExtension {
     return this.dom.isValidWatchContainer(element);
   }
 
-  attemptToAddButton() {
-    if (!this.isYoutubeVideoPage()) {
+  attemptToAddButton(surface = this.getPageSurface()) {
+    if (surface === 'other') {
       return;
     }
 
-    if (this.transcriptButton && document.contains(this.transcriptButton)) {
+    const buttonRoot =
+      this.transcriptButtonRoot && document.contains(this.transcriptButtonRoot)
+        ? this.transcriptButtonRoot
+        : this.transcriptButton;
+
+    if (buttonRoot && document.contains(buttonRoot)) {
       return;
     }
 
-    const container = this.findSuitableButtonContainer();
+    const container = surface === 'watch_like'
+      ? this.findSuitableButtonContainer()
+      : this.findSuitableShortsActionBar();
 
-    if (!container) {
-      return;
+    if (container) {
+      this.createAndInsertButton(container, surface);
     }
-
-    this.createAndInsertButton(container);
   }
 
-  createAndInsertButton(targetContainer) {
-    if (this.transcriptButton && document.contains(this.transcriptButton)) {
+  createAndInsertButton(targetContainer, surface = 'watch_like') {
+    const buttonRoot = this.getButtonRoot();
+
+    if (buttonRoot && document.contains(buttonRoot)) {
+      return;
+    }
+
+    if (surface === 'shorts') {
+      this.createAndInsertShortsButton(targetContainer);
       return;
     }
 
@@ -281,6 +313,27 @@ class YoutubeTranscriptionExtension {
 
     targetContainer.appendChild(button);
     this.transcriptButton = button;
+    this.transcriptButtonRoot = button;
+  }
+
+  createAndInsertShortsButton(targetContainer) {
+    let shortsButton = null;
+    const shortsAction = this.dom.createShortsTranscriptButton(document, targetContainer, () => {
+      void this.handleTranscriptButtonClick(shortsButton);
+    });
+
+    if (!shortsAction?.root || !shortsAction.button) {
+      return;
+    }
+
+    shortsButton = shortsAction.button;
+    if (typeof this.dom.insertShortsTranscriptButton === 'function') {
+      this.dom.insertShortsTranscriptButton(targetContainer, shortsAction.root);
+    } else {
+      targetContainer.appendChild(shortsAction.root);
+    }
+    this.transcriptButton = shortsAction.button;
+    this.transcriptButtonRoot = shortsAction.root;
   }
 
   isMainActionTarget(button) {
@@ -410,6 +463,11 @@ class YoutubeTranscriptionExtension {
   }
 
   updateButtonState(state) {
+    if (this.transcriptButtonRoot?.getAttribute?.('data-yt-shorts-transcript-button') === 'true') {
+      this.dom.updateShortsButtonState(this.transcriptButton, state);
+      return;
+    }
+
     this.dom.updateButtonState(this.transcriptButton, state);
   }
 

@@ -15,6 +15,18 @@
     (data) => data?.microformat?.playerMicroformatRenderer?.title?.simpleText,
   ];
 
+  function readTitleFromData(data) {
+    for (const readTitle of TITLE_READERS) {
+      const title = readTitle(data);
+
+      if (title) {
+        return title;
+      }
+    }
+
+    return null;
+  }
+
   function readBalancedObject(source, objectStart) {
     let depth = 0;
     let inString = false;
@@ -105,28 +117,29 @@
   }
 
   function getTitleFromData(data) {
-    for (const readTitle of TITLE_READERS) {
-      const title = readTitle(data);
-
-      if (title) {
-        return title;
-      }
-    }
-
-    return 'Untitled Video';
+    return readTitleFromData(data) || 'Untitled Video';
   }
 
   function resolvePageData(html) {
-    try {
-      const initialData = extractJsonBlob(html, 'ytInitialData');
+    let initialData = null;
 
-      return {
-        resolvedType: 'regular',
-        sourceKey: 'ytInitialData',
-        data: initialData,
-        title: getTitleFromData(initialData),
-      };
+    try {
+      initialData = extractJsonBlob(html, 'ytInitialData');
+      const initialDataTitle = readTitleFromData(initialData);
+
+      if (initialDataTitle) {
+        return {
+          resolvedType: 'regular',
+          sourceKey: 'ytInitialData',
+          data: initialData,
+          title: initialDataTitle,
+        };
+      }
     } catch (error) {
+      initialData = null;
+    }
+
+    try {
       const playerResponse = extractJsonBlob(html, 'ytInitialPlayerResponse');
 
       return {
@@ -134,6 +147,13 @@
         sourceKey: 'ytInitialPlayerResponse',
         data: playerResponse,
         title: getTitleFromData(playerResponse),
+      };
+    } catch (error) {
+      return {
+        resolvedType: 'regular',
+        sourceKey: 'ytInitialData',
+        data: initialData,
+        title: getTitleFromData(initialData),
       };
     }
   }
@@ -319,10 +339,30 @@
   }
 
   function getVideoIdFromUrl(url) {
-    const parsedUrl = new URL(url);
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const normalizedHostname = hostname.replace(/^www\./, '');
 
-    if (parsedUrl.pathname === '/watch') {
-      return parsedUrl.searchParams.get('v');
+      if (normalizedHostname === 'youtu.be') {
+        return parsedUrl.pathname.slice(1).split('/')[0] || null;
+      }
+
+      if (!normalizedHostname.endsWith('youtube.com')) {
+        return null;
+      }
+
+      if (parsedUrl.pathname === '/watch') {
+        return parsedUrl.searchParams.get('v');
+      }
+
+      const pathMatch = parsedUrl.pathname.match(/^\/(shorts|embed|live|v)\/([^/?]+)/);
+
+      if (pathMatch?.[2]) {
+        return pathMatch[2];
+      }
+    } catch (error) {
+      return null;
     }
 
     return null;

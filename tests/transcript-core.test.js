@@ -84,6 +84,29 @@ test('resolvePageData prefers ytInitialData title without exposing transcript en
   assert.deepEqual(Object.keys(result).sort(), ['data', 'resolvedType', 'sourceKey', 'title']);
 });
 
+test('resolvePageData falls back to ytInitialPlayerResponse title when ytInitialData has no title', () => {
+  const html = `
+    <script>
+      var ytInitialData = {
+        "contents": {
+          "twoColumnWatchNextResults": {}
+        }
+      };
+      var ytInitialPlayerResponse = {
+        "videoDetails": {
+          "title": "The Leverage Problem No One is Talking About"
+        }
+      };
+    </script>
+  `;
+
+  const result = core.resolvePageData(html);
+
+  assert.equal(result.resolvedType, 'shorts');
+  assert.equal(result.sourceKey, 'ytInitialPlayerResponse');
+  assert.equal(result.title, 'The Leverage Problem No One is Talking About');
+});
+
 test('TranscriptCore no longer exports transcript endpoint helpers', () => {
   assert.deepEqual(Object.keys(core).sort(), [
     'buildTimedTextUrl',
@@ -163,13 +186,17 @@ test('buildTimedTextUrl appends json3 format and optional pot token', () => {
   );
 });
 
-test('getVideoIdFromUrl only supports watch pages', () => {
-  assert.equal(
-    core.getVideoIdFromUrl('https://www.youtube.com/watch?v=abc123'),
-    'abc123'
-  );
-  assert.equal(
-    core.getVideoIdFromUrl('https://www.youtube.com/shorts/abc123'),
-    null
-  );
+test('getVideoIdFromUrl parses supported YouTube URL formats', () => {
+  assert.equal(core.getVideoIdFromUrl('https://www.youtube.com/watch?v=abc123'), 'abc123');
+  assert.equal(core.getVideoIdFromUrl('https://youtu.be/abc123'), 'abc123');
+  assert.equal(core.getVideoIdFromUrl('https://www.youtube.com/shorts/abc123'), 'abc123');
+  assert.equal(core.getVideoIdFromUrl('https://www.youtube.com/embed/abc123'), 'abc123');
+  assert.equal(core.getVideoIdFromUrl('https://www.youtube.com/live/abc123'), 'abc123');
+  assert.equal(core.getVideoIdFromUrl('https://www.youtube.com/v/abc123'), 'abc123');
+});
+
+test('getVideoIdFromUrl rejects malformed or unsupported URLs', () => {
+  assert.equal(core.getVideoIdFromUrl('https://www.youtube.com/watch'), null);
+  assert.equal(core.getVideoIdFromUrl('https://www.youtube.com/shorts/'), null);
+  assert.equal(core.getVideoIdFromUrl('https://example.com/watch?v=abc123'), null);
 });
