@@ -159,7 +159,9 @@
   }
 
   function getCaptionBaseUrl(playerResponse) {
-    return playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks?.[0]?.baseUrl || null;
+    return selectCaptionTrack(
+      playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks
+    )?.baseUrl || null;
   }
 
   function decodeJsonStringValue(value) {
@@ -200,9 +202,17 @@
       return null;
     }
 
+    const validTracks = captionTracks.filter((track) => track?.baseUrl);
+    const englishTracks = validTracks.filter((track) => {
+      const languageCode = String(track.languageCode || '').toLowerCase();
+      return languageCode === 'en' || languageCode.startsWith('en-');
+    });
+
     return (
-      captionTracks.find((track) => track?.baseUrl && track.kind !== 'asr') ||
-      captionTracks.find((track) => track?.baseUrl) ||
+      englishTracks.find((track) => track.kind !== 'asr') ||
+      englishTracks[0] ||
+      validTracks.find((track) => track.kind !== 'asr') ||
+      validTracks[0] ||
       null
     );
   }

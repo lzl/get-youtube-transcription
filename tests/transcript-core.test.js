@@ -144,6 +144,22 @@ test('selectCaptionTrack prefers manual tracks over ASR tracks', () => {
   ]), { languageCode: 'en', baseUrl: 'https://example.com/manual' });
 });
 
+test('selectCaptionTrack prefers English tracks over earlier tracks in other languages', () => {
+  const tracks = [
+    { languageCode: 'ar', baseUrl: 'https://example.com/arabic' },
+    { languageCode: 'en', kind: 'asr', baseUrl: 'https://example.com/english-asr' },
+    { languageCode: 'en', baseUrl: 'https://example.com/english-manual' },
+  ];
+
+  assert.deepEqual(core.selectCaptionTrack(tracks), tracks[2]);
+  assert.equal(
+    core.getCaptionBaseUrl({
+      captions: { playerCaptionsTracklistRenderer: { captionTracks: tracks } },
+    }),
+    'https://example.com/english-manual'
+  );
+});
+
 test('normalizeTranscriptSegments supports json3 events', () => {
   assert.equal(typeof core.normalizeTranscriptSegments, 'function');
 
